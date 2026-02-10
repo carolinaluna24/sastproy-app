@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           assigned_by: string
           created_at: string
+          due_date: string | null
           id: string
           project_id: string
           stage_name: Database["public"]["Enums"]["stage_name"]
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           assigned_by: string
           created_at?: string
+          due_date?: string | null
           id?: string
           project_id: string
           stage_name: Database["public"]["Enums"]["stage_name"]
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           assigned_by?: string
           created_at?: string
+          due_date?: string | null
           id?: string
           project_id?: string
           stage_name?: Database["public"]["Enums"]["stage_name"]
@@ -205,6 +208,8 @@ export type Database = {
           evaluator_id: string
           id: string
           observations: string | null
+          official_result: string | null
+          project_stage_id: string | null
           submission_id: string
         }
         Insert: {
@@ -212,6 +217,8 @@ export type Database = {
           evaluator_id: string
           id?: string
           observations?: string | null
+          official_result?: string | null
+          project_stage_id?: string | null
           submission_id: string
         }
         Update: {
@@ -219,9 +226,18 @@ export type Database = {
           evaluator_id?: string
           id?: string
           observations?: string | null
+          official_result?: string | null
+          project_stage_id?: string | null
           submission_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "evaluations_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "evaluations_submission_id_fkey"
             columns: ["submission_id"]
@@ -348,6 +364,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          director_id: string | null
           global_status: Database["public"]["Enums"]["global_status"]
           id: string
           modality_id: string
@@ -359,6 +376,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          director_id?: string | null
           global_status?: Database["public"]["Enums"]["global_status"]
           id?: string
           modality_id: string
@@ -370,6 +388,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          director_id?: string | null
           global_status?: Database["public"]["Enums"]["global_status"]
           id?: string
           modality_id?: string
@@ -378,6 +397,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_modality_id_fkey"
             columns: ["modality_id"]

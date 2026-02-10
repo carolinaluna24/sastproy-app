@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FolderOpen, FileCheck, Users } from "lucide-react";
+import { FolderOpen, FileCheck, Users, BookOpen } from "lucide-react";
 
 export default function CoordinatorDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [pendingProposals, setPendingProposals] = useState<any[]>([]);
+  const [anteproyectoStages, setAnteproyectoStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,20 +20,26 @@ export default function CoordinatorDashboard() {
   async function loadData() {
     setLoading(true);
 
-    const { data: allProjects } = await supabase
-      .from("projects")
-      .select("*, programs(name), modalities(name)")
-      .order("created_at", { ascending: false });
-    setProjects(allProjects || []);
+    const [projectsRes, proposalsRes, anteRes] = await Promise.all([
+      supabase
+        .from("projects")
+        .select("*, programs(name), modalities(name)")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("project_stages")
+        .select("*, projects(id, title, programs(name))")
+        .eq("stage_name", "PROPUESTA")
+        .eq("system_state", "RADICADA"),
+      supabase
+        .from("project_stages")
+        .select("*, projects(id, title, programs(name))")
+        .eq("stage_name", "ANTEPROYECTO")
+        .neq("system_state", "CERRADA"),
+    ]);
 
-    // Get proposal stages that are RADICADA (submitted, pending evaluation)
-    const { data: proposalStages } = await supabase
-      .from("project_stages")
-      .select("*, projects(id, title, programs(name))")
-      .eq("stage_name", "PROPUESTA")
-      .eq("system_state", "RADICADA");
-    setPendingProposals(proposalStages || []);
-
+    setProjects(projectsRes.data || []);
+    setPendingProposals(proposalsRes.data || []);
+    setAnteproyectoStages(anteRes.data || []);
     setLoading(false);
   }
 
@@ -47,6 +54,25 @@ export default function CoordinatorDashboard() {
     CANCELADO: "bg-destructive/80 text-destructive-foreground",
   };
 
+  /** Determina la acción del coordinador para cada etapa de anteproyecto */
+  function getAnteAction(stage: any) {
+    if (stage.system_state === "RADICADA") {
+      return (
+        <Link to={`/anteproyecto/${stage.id}/assign-jurors`}>
+          <Button size="sm" variant="outline" className="text-xs">Asignar Jurados</Button>
+        </Link>
+      );
+    }
+    if (stage.system_state === "EN_REVISION") {
+      return (
+        <Link to={`/anteproyecto/${stage.id}/consolidate`}>
+          <Button size="sm" variant="outline" className="text-xs">Consolidar</Button>
+        </Link>
+      );
+    }
+    return null;
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -55,7 +81,7 @@ export default function CoordinatorDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <div className="rounded-lg bg-primary/10 p-2.5">
@@ -80,6 +106,17 @@ export default function CoordinatorDashboard() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
+            <div className="rounded-lg bg-accent p-2.5">
+              <BookOpen className="h-5 w-5 text-accent-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{anteproyectoStages.length}</p>
+              <p className="text-xs text-muted-foreground">Anteproyectos activos</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4">
             <div className="rounded-lg bg-success/10 p-2.5">
               <Users className="h-5 w-5 text-success" />
             </div>
@@ -91,7 +128,7 @@ export default function CoordinatorDashboard() {
         </Card>
       </div>
 
-      {/* Pending proposals */}
+      {/* Propuestas pendientes */}
       {pendingProposals.length > 0 && (
         <Card>
           <CardHeader>
@@ -106,9 +143,7 @@ export default function CoordinatorDashboard() {
                     <p className="text-xs text-muted-foreground">{ps.projects?.programs?.name}</p>
                   </div>
                   <Link to={`/proposals/${ps.id}/evaluate`}>
-                    <Button size="sm" variant="outline" className="text-xs">
-                      Evaluar
-                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs">Evaluar</Button>
                   </Link>
                 </div>
               ))}
@@ -117,7 +152,32 @@ export default function CoordinatorDashboard() {
         </Card>
       )}
 
-      {/* All projects table */}
+      {/* Anteproyectos activos */}
+      {anteproyectoStages.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Anteproyectos en Curso</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {anteproyectoStages.map((as_) => (
+                <div key={as_.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-medium text-sm">{as_.projects?.title}</p>
+                    <div className="flex gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{as_.system_state}</Badge>
+                      <Badge variant="outline" className="text-xs">{as_.official_state}</Badge>
+                    </div>
+                  </div>
+                  {getAnteAction(as_)}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabla de todos los proyectos */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Todos los Proyectos</CardTitle>
