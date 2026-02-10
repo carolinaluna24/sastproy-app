@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import { useNavigate, Outlet, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, Shield } from "lucide-react";
 
 const navItems: Record<string, { label: string; path: string; icon: React.ElementType }[]> = {
   STUDENT: [
@@ -14,7 +14,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
     { label: "Propuestas", path: "/proposals", icon: FileCheck },
   ],
   DIRECTOR: [
-    { label: "Proyectos", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Mis Proyectos", path: "/dashboard", icon: LayoutDashboard },
   ],
   JUROR: [
     { label: "Asignaciones", path: "/dashboard", icon: Clock },
@@ -54,7 +54,6 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top navbar */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-3">

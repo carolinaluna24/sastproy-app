@@ -42,7 +42,6 @@ export default function StudentDashboard() {
 
   async function loadProject() {
     setLoading(true);
-    // Get projects where user is a member
     const { data: memberships } = await supabase
       .from("project_members")
       .select("project_id")
@@ -90,6 +89,25 @@ export default function StudentDashboard() {
         </Link>
       </div>
     );
+  }
+
+  /** Determina qué acciones puede hacer el estudiante en cada etapa */
+  function getStageAction(stage: any) {
+    if (stage.stage_name === "PROPUESTA" && stage.system_state === "BORRADOR") {
+      return (
+        <Link to={`/projects/${project.id}/submit-proposal`}>
+          <Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Propuesta</Button>
+        </Link>
+      );
+    }
+    if (stage.stage_name === "ANTEPROYECTO" && stage.system_state === "BORRADOR") {
+      return (
+        <Link to={`/projects/${project.id}/submit-anteproject`}>
+          <Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Anteproyecto</Button>
+        </Link>
+      );
+    }
+    return null;
   }
 
   return (
@@ -142,13 +160,7 @@ export default function StudentDashboard() {
                   <Badge variant="outline" className="text-xs">
                     {officialLabels[stage.official_state] || stage.official_state}
                   </Badge>
-                  {stage.stage_name === "PROPUESTA" && stage.system_state === "BORRADOR" && (
-                    <Link to={`/projects/${project.id}/submit-proposal`}>
-                      <Button size="sm" variant="outline" className="mt-2 text-xs">
-                        Radicar Propuesta
-                      </Button>
-                    </Link>
-                  )}
+                  {getStageAction(stage)}
                 </div>
               </CardContent>
             </Card>
