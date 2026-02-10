@@ -27,6 +27,8 @@ import SubmitFinalDelivery from "./pages/sustentacion/SubmitFinalDelivery";
 import CoordinatorReports from "./pages/reports/CoordinatorReports";
 import DeadlinesRisk from "./pages/reports/DeadlinesRisk";
 import ProjectsReport from "./pages/reports/ProjectsReport";
+import Catalog from "./pages/catalog/Catalog";
+import CatalogProjectDetail from "./pages/catalog/CatalogProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +69,9 @@ const App = () => (
             <Route path="/reports" element={<CoordinatorReports />} />
             <Route path="/reports/deadlines" element={<DeadlinesRisk />} />
             <Route path="/reports/projects" element={<ProjectsReport />} />
+            {/* Catálogo */}
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/catalog/:projectId" element={<CatalogProjectDetail />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
