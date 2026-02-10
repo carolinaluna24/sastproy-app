@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,15 +23,16 @@ interface ProjectRow {
 const ALL = "__ALL__";
 
 export default function ProjectsReport() {
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros
+  // Initialize filters from URL params
   const [filterProgram, setFilterProgram] = useState(ALL);
-  const [filterStatus, setFilterStatus] = useState(ALL);
-  const [filterStage, setFilterStage] = useState(ALL);
-  const [filterOfficial, setFilterOfficial] = useState(ALL);
+  const [filterStatus, setFilterStatus] = useState(searchParams.get("status") || ALL);
+  const [filterStage, setFilterStage] = useState(searchParams.get("stage") || ALL);
+  const [filterOfficial, setFilterOfficial] = useState(searchParams.get("official") || ALL);
 
   useEffect(() => {
     async function load() {
@@ -46,7 +48,6 @@ export default function ProjectsReport() {
     load();
   }, []);
 
-  // Aplicar filtros
   const filtered = rows.filter((r) => {
     if (filterProgram !== ALL && r.program_name !== filterProgram) return false;
     if (filterStatus !== ALL && r.global_status !== filterStatus) return false;
@@ -55,21 +56,12 @@ export default function ProjectsReport() {
     return true;
   });
 
-  // Exportar CSV (simple, client-side)
   function exportCSV() {
     const headers = ["Título", "Programa", "Estado", "Etapa", "Estado Oficial", "Nota Final", "Creado"];
     const csvRows = [
       headers.join(","),
       ...filtered.map((r) =>
-        [
-          `"${r.project_title}"`,
-          `"${r.program_name || ""}"`,
-          r.global_status,
-          r.stage_name,
-          r.official_state,
-          r.final_grade ?? "",
-          new Date(r.project_created_at).toLocaleDateString("es-CO"),
-        ].join(",")
+        [`"${r.project_title}"`, `"${r.program_name || ""}"`, r.global_status, r.stage_name, r.official_state, r.final_grade ?? "", new Date(r.project_created_at).toLocaleDateString("es-CO")].join(",")
       ),
     ];
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -99,12 +91,12 @@ export default function ProjectsReport() {
           <h1 className="text-2xl font-bold">Reporte de Proyectos</h1>
           <p className="text-muted-foreground text-sm">Listado filtrable con exportación CSV</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
-          <Download className="h-4 w-4" /> Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Link to="/reports"><Button variant="outline" size="sm" className="text-xs">← Indicadores</Button></Link>
+          <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2"><Download className="h-4 w-4" /> Exportar CSV</Button>
+        </div>
       </div>
 
-      {/* Filtros */}
       <Card>
         <CardContent className="pt-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -114,9 +106,7 @@ export default function ProjectsReport() {
                 <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todos</SelectItem>
-                  {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                  ))}
+                  {programs.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -163,11 +153,8 @@ export default function ProjectsReport() {
         </CardContent>
       </Card>
 
-      {/* Tabla */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{filtered.length} proyecto(s) encontrado(s)</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base">{filtered.length} proyecto(s) encontrado(s)</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -187,30 +174,16 @@ export default function ProjectsReport() {
                 <TableRow key={r.project_id}>
                   <TableCell className="font-medium text-sm max-w-[200px] truncate">{r.project_title}</TableCell>
                   <TableCell className="text-sm">{r.program_name || "—"}</TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${statusColors[r.global_status] || "bg-muted"}`}>{r.global_status}</Badge>
-                  </TableCell>
+                  <TableCell><Badge className={`text-xs ${statusColors[r.global_status] || "bg-muted"}`}>{r.global_status}</Badge></TableCell>
                   <TableCell className="text-sm">{r.stage_name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r.official_state}</Badge>
-                  </TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs">{r.official_state}</Badge></TableCell>
                   <TableCell className="text-sm">{r.final_grade ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(r.project_created_at).toLocaleDateString("es-CO")}
-                  </TableCell>
-                  <TableCell>
-                    <Link to={`/projects/${r.project_id}`}>
-                      <Button variant="ghost" size="sm" className="text-xs">Ver</Button>
-                    </Link>
-                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{new Date(r.project_created_at).toLocaleDateString("es-CO")}</TableCell>
+                  <TableCell><Link to={`/projects/${r.project_id}`}><Button variant="ghost" size="sm" className="text-xs">Ver</Button></Link></TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    No se encontraron proyectos con esos filtros
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No se encontraron proyectos con esos filtros</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
