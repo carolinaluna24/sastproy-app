@@ -1,5 +1,16 @@
-import { supabase } from "@/integrations/supabase/client";
+/**
+ * auth.ts
+ * =======
+ * Funciones de autenticación y gestión de roles.
+ *
+ * Usa Supabase Auth para login/logout y la tabla user_roles
+ * para determinar el rol del usuario (STUDENT, COORDINATOR, DIRECTOR, JUROR).
+ *
+ * Los roles se almacenan en una tabla separada (user_roles) por seguridad,
+ * nunca en el perfil del usuario, para evitar escalación de privilegios.
+ */
 
+import { supabase } from "@/integrations/supabase/client";
 export type AppRole = "STUDENT" | "COORDINATOR" | "DIRECTOR" | "JUROR";
 
 export async function signIn(email: string, password: string) {

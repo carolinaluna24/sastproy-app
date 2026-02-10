@@ -28,6 +28,10 @@ serve(async (req) => {
     const { data: modalities } = await supabase.from("modalities").upsert([
       { name: "TRABAJO_GRADO" },
       { name: "PASANTIA" },
+      { name: "CIP" },
+      { name: "PASANTIA_EMPRESARIAL" },
+      { name: "POSGRADO_CREDITOS" },
+      { name: "GRUPO_INVESTIGACION" },
     ], { onConflict: "name" }).select();
 
     const progInfo = programs!.find((p: any) => p.name === "Ingeniería Informática")!;
@@ -35,6 +39,25 @@ serve(async (req) => {
     const progCiv = programs!.find((p: any) => p.name === "Ingeniería Civil")!;
     const modTG = modalities!.find((m: any) => m.name === "TRABAJO_GRADO")!;
     const modPas = modalities!.find((m: any) => m.name === "PASANTIA")!;
+
+    // Seed de modality_configs (configuración de escalabilidad)
+    for (const mod of modalities!) {
+      const isImplemented = mod.name === "TRABAJO_GRADO";
+      const descriptions: Record<string, string> = {
+        TRABAJO_GRADO: "Trabajo de Grado: flujo completo implementado (Propuesta → Anteproyecto → Informe Final → Sustentación → Cierre).",
+        CIP: "Curso de Investigación Profesional: modalidad habilitada pero flujo detallado pendiente de implementación.",
+        PASANTIA: "Pasantía académica: modalidad habilitada pero flujo detallado pendiente de implementación.",
+        PASANTIA_EMPRESARIAL: "Pasantía Empresarial: modalidad habilitada pero flujo detallado pendiente de implementación.",
+        POSGRADO_CREDITOS: "Posgrado por Créditos: modalidad habilitada pero flujo detallado pendiente de implementación.",
+        GRUPO_INVESTIGACION: "Grupo de Investigación: modalidad habilitada pero flujo detallado pendiente de implementación.",
+      };
+      await supabase.from("modality_configs").upsert({
+        modality_id: mod.id,
+        enabled: true,
+        implemented: isImplemented,
+        description: descriptions[mod.name] || "Modalidad pendiente.",
+      }, { onConflict: "modality_id" });
+    }
 
     // =========================================
     // 2. USUARIOS (13 usuarios)
