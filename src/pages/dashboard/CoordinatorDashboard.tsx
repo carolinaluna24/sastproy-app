@@ -1,3 +1,15 @@
+/**
+ * CoordinatorDashboard.tsx
+ * ========================
+ * Dashboard principal para el rol COORDINATOR.
+ * Muestra KPIs rápidos, propuestas pendientes, etapas activas de
+ * anteproyecto/informe final/sustentación, y la tabla completa de proyectos.
+ *
+ * Conexiones:
+ * - Consulta projects, project_stages para conteos y listados.
+ * - Enlaza a páginas de evaluación, asignación de jurados y consolidación.
+ */
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";

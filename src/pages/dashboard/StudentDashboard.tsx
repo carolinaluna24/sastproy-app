@@ -1,3 +1,15 @@
+/**
+ * StudentDashboard.tsx
+ * ====================
+ * Dashboard principal para el rol STUDENT.
+ * Muestra el proyecto activo del estudiante con sus etapas y acciones disponibles.
+ *
+ * Conexiones:
+ * - Consulta project_members para encontrar el proyecto del estudiante.
+ * - Consulta projects y project_stages para mostrar el estado.
+ * - Enlaza a páginas de radicación según la etapa y estado actual.
+ */
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";

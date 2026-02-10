@@ -1,3 +1,16 @@
+/**
+ * useAuth.ts
+ * ==========
+ * Hook personalizado para manejar el estado de autenticación.
+ *
+ * Escucha cambios en la sesión de Supabase Auth y carga los roles
+ * del usuario desde la tabla user_roles.
+ *
+ * Retorna: user (objeto del usuario), roles (lista de roles),
+ * primaryRole (primer rol, usado para determinar el dashboard),
+ * loading (estado de carga).
+ */
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { type AppRole, getCurrentUserRoles } from "@/lib/auth";

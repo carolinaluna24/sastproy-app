@@ -29,6 +29,7 @@ import DeadlinesRisk from "./pages/reports/DeadlinesRisk";
 import ProjectsReport from "./pages/reports/ProjectsReport";
 import Catalog from "./pages/catalog/Catalog";
 import CatalogProjectDetail from "./pages/catalog/CatalogProjectDetail";
+import Scalability from "./pages/about/Scalability";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,8 @@ const App = () => (
             {/* Catálogo */}
             <Route path="/catalog" element={<Catalog />} />
             <Route path="/catalog/:projectId" element={<CatalogProjectDetail />} />
+            {/* Información */}
+            <Route path="/about/scalability" element={<Scalability />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
