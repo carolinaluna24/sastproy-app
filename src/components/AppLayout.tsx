@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import { useNavigate, Outlet, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, Shield } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, Shield, BarChart3 } from "lucide-react";
 
 const navItems: Record<string, { label: string; path: string; icon: React.ElementType }[]> = {
   STUDENT: [
@@ -12,6 +12,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
   COORDINATOR: [
     { label: "Proyectos", path: "/dashboard", icon: LayoutDashboard },
     { label: "Propuestas", path: "/proposals", icon: FileCheck },
+    { label: "Reportes", path: "/reports", icon: BarChart3 },
   ],
   DIRECTOR: [
     { label: "Mis Proyectos", path: "/dashboard", icon: LayoutDashboard },
