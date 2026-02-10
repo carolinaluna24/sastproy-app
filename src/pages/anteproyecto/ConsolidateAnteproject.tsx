@@ -123,6 +123,21 @@ export default function ConsolidateAnteproject() {
         });
       }
 
+      // Si APROBADA => crear etapa INFORME_FINAL
+      if (consolidatedResult === "APROBADA") {
+        await supabase.from("project_stages").insert({
+          project_id: stage.project_id,
+          stage_name: "INFORME_FINAL" as const,
+          system_state: "BORRADOR" as const,
+        });
+        await supabase.from("audit_events").insert({
+          project_id: stage.project_id,
+          user_id: user.id,
+          event_type: "INFORME_FINAL_STAGE_CREATED",
+          description: "Etapa INFORME FINAL habilitada tras aprobación del anteproyecto",
+        });
+      }
+
       // Auditoría
       await supabase.from("audit_events").insert({
         project_id: stage.project_id,
