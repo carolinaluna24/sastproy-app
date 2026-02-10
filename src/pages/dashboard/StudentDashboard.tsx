@@ -1,11 +1,6 @@
 /**
- * StudentDashboard.tsx
- * ====================
- * Dashboard principal para el rol STUDENT.
- * Muestra el proyecto activo con etapas 1-4, evaluaciones,
- * observaciones, estados y acciones disponibles (radicar, solicitar aval).
+ * StudentDashboard.tsx - Dashboard del estudiante con upload de documentos por etapa
  */
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,8 +9,11 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, Eye, Send } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, Eye, Send, Upload } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   VIGENTE: "bg-success text-success-foreground",
@@ -46,11 +44,20 @@ export default function StudentDashboard() {
   const { toast } = useToast();
   const [project, setProject] = useState<any>(null);
   const [stages, setStages] = useState<any[]>([]);
+  const [submissionsByStage, setSubmissionsByStage] = useState<Record<string, any[]>>({});
   const [evaluationsByStage, setEvaluationsByStage] = useState<Record<string, any[]>>({});
   const [endorsementsByStage, setEndorsementsByStage] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { if (!user) return; loadProject(); }, [user]);
+  // Upload dialog state
+  const [uploadStage, setUploadStage] = useState<any>(null);
+  const [uploadUrl, setUploadUrl] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadNotes, setUploadNotes] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  useEffect(() => { if (user) loadProject(); }, [user]);
 
   async function loadProject() {
     setLoading(true);
@@ -70,14 +77,16 @@ export default function StudentDashboard() {
         const stagesList = stg || [];
         setStages(stagesList);
 
-        // Cargar evaluaciones y avales por etapa
         const evalMap: Record<string, any[]> = {};
         const endorseMap: Record<string, any[]> = {};
+        const subsMap: Record<string, any[]> = {};
 
         for (const stage of stagesList) {
-          // Evaluaciones de jurados
           const { data: subs } = await supabase
-            .from("submissions").select("id").eq("project_stage_id", stage.id);
+            .from("submissions").select("id, version, external_url, file_url, notes, created_at")
+            .eq("project_stage_id", stage.id).order("version", { ascending: false });
+          subsMap[stage.id] = subs || [];
+
           if (subs && subs.length > 0) {
             const subIds = subs.map(s => s.id);
             const { data: evals } = await supabase
@@ -85,13 +94,13 @@ export default function StudentDashboard() {
               .in("submission_id", subIds);
             evalMap[stage.id] = evals || [];
 
-            // Avales del director
             const { data: endorsements } = await supabase
               .from("endorsements").select("*, user_profiles:endorsed_by(full_name)")
               .in("submission_id", subIds);
             endorseMap[stage.id] = endorsements || [];
           }
         }
+        setSubmissionsByStage(subsMap);
         setEvaluationsByStage(evalMap);
         setEndorsementsByStage(endorseMap);
       }
@@ -99,18 +108,69 @@ export default function StudentDashboard() {
     setLoading(false);
   }
 
+  async function handleUploadDocument() {
+    if (!user || !project || !uploadStage) return;
+    setUploading(true);
+
+    try {
+      let fileUrl: string | null = null;
+
+      // Upload file to storage if provided
+      if (uploadFile) {
+        const ext = uploadFile.name.split(".").pop();
+        const path = `${user.id}/${project.id}/${uploadStage.id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("documents").upload(path, uploadFile);
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+      }
+
+      const { count } = await supabase.from("submissions")
+        .select("*", { count: "exact", head: true }).eq("project_stage_id", uploadStage.id);
+      const version = (count || 0) + 1;
+
+      const { error: subErr } = await supabase.from("submissions").insert({
+        project_stage_id: uploadStage.id,
+        submitted_by: user.id,
+        version,
+        external_url: uploadUrl || null,
+        file_url: fileUrl,
+        notes: uploadNotes || null,
+      });
+      if (subErr) throw subErr;
+
+      // Update stage to RADICADA if BORRADOR or CON_OBSERVACIONES
+      if (uploadStage.system_state === "BORRADOR" || uploadStage.system_state === "CON_OBSERVACIONES") {
+        await supabase.from("project_stages").update({ system_state: "RADICADA" }).eq("id", uploadStage.id);
+      }
+
+      await supabase.from("audit_events").insert({
+        project_id: project.id, user_id: user.id,
+        event_type: `${uploadStage.stage_name}_SUBMITTED`,
+        description: `Documento radicado para ${uploadStage.stage_name} (v${version})`,
+        metadata: { version, stage_id: uploadStage.id },
+      });
+
+      toast({ title: "Documento radicado exitosamente" });
+      setUploadOpen(false);
+      setUploadUrl(""); setUploadFile(null); setUploadNotes(""); setUploadStage(null);
+      loadProject();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleRequestEndorsement(stage: any) {
     if (!user || !project) return;
-    // Verificar que la etapa esté RADICADA
     if (stage.system_state !== "RADICADA") {
       toast({ title: "La etapa debe estar radicada para solicitar aval", variant: "destructive" });
       return;
     }
-
     try {
       await supabase.from("audit_events").insert({
-        project_id: project.id,
-        user_id: user.id,
+        project_id: project.id, user_id: user.id,
         event_type: "ENDORSEMENT_REQUESTED",
         description: `Estudiante solicita aval del director para ${stage.stage_name}`,
         metadata: { stage_id: stage.id, stage_name: stage.stage_name },
@@ -134,36 +194,25 @@ export default function StudentDashboard() {
     );
   }
 
-  /** Acciones del estudiante según etapa y estado */
+  function canUpload(stage: any) {
+    return ["BORRADOR", "CON_OBSERVACIONES"].includes(stage.system_state) && stage.stage_name !== "SUSTENTACION";
+  }
+
   function getStageActions(stage: any) {
-    const { stage_name, system_state, official_state, final_grade } = stage;
     const actions: React.ReactNode[] = [];
 
-    // Botón de radicar según etapa
-    if (stage_name === "PROPUESTA" && system_state === "BORRADOR") {
+    // Upload document button
+    if (canUpload(stage)) {
       actions.push(
-        <Link key="submit" to={`/projects/${project.id}/submit-proposal`}>
-          <Button size="sm" variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />Radicar Propuesta</Button>
-        </Link>
-      );
-    }
-    if (stage_name === "ANTEPROYECTO" && system_state === "BORRADOR") {
-      actions.push(
-        <Link key="submit" to={`/projects/${project.id}/submit-anteproject`}>
-          <Button size="sm" variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />Radicar Anteproyecto</Button>
-        </Link>
-      );
-    }
-    if (stage_name === "INFORME_FINAL" && system_state === "BORRADOR") {
-      actions.push(
-        <Link key="submit" to={`/projects/${project.id}/submit-informe-final`}>
-          <Button size="sm" variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />Radicar Informe Final</Button>
-        </Link>
+        <Button key="upload" size="sm" variant="outline" className="text-xs gap-1"
+          onClick={() => { setUploadStage(stage); setUploadOpen(true); }}>
+          <Upload className="h-3 w-3" />Subir Documento
+        </Button>
       );
     }
 
-    // Botón solicitar aval (para ANTEPROYECTO e INFORME_FINAL cuando está RADICADA)
-    if ((stage_name === "ANTEPROYECTO" || stage_name === "INFORME_FINAL") && system_state === "RADICADA") {
+    // Request endorsement (ANTEPROYECTO, INFORME_FINAL when RADICADA)
+    if ((stage.stage_name === "ANTEPROYECTO" || stage.stage_name === "INFORME_FINAL") && stage.system_state === "RADICADA") {
       const hasEndorsement = (endorsementsByStage[stage.id] || []).length > 0;
       if (!hasEndorsement) {
         actions.push(
@@ -175,7 +224,7 @@ export default function StudentDashboard() {
     }
 
     // Post-sustentación
-    if (stage_name === "SUSTENTACION" && system_state === "CERRADA" && final_grade !== null && final_grade >= 70 && project.global_status === "VIGENTE") {
+    if (stage.stage_name === "SUSTENTACION" && stage.system_state === "CERRADA" && stage.final_grade !== null && stage.final_grade >= 70 && project.global_status === "VIGENTE") {
       actions.push(
         <Link key="final" to={`/projects/${project.id}/submit-final-delivery`}>
           <Button size="sm" variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />Entregar Documento Final</Button>
@@ -193,7 +242,6 @@ export default function StudentDashboard() {
         <p className="text-muted-foreground text-sm">Seguimiento de tu trabajo de grado</p>
       </div>
 
-      {/* Info del proyecto */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -208,11 +256,10 @@ export default function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Etapas 1-4 */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Avance por Etapas</h2>
         <div className="space-y-4">
-          {stageOrder.map((stageName, idx) => {
+          {stageOrder.map((stageName) => {
             const stage = stages.find(s => s.stage_name === stageName);
             if (!stage) {
               return (
@@ -227,12 +274,12 @@ export default function StudentDashboard() {
 
             const evals = evaluationsByStage[stage.id] || [];
             const endorsements = endorsementsByStage[stage.id] || [];
+            const submissions = submissionsByStage[stage.id] || [];
             const actions = getStageActions(stage);
 
             return (
               <Card key={stage.id}>
                 <CardContent className="py-4 space-y-3">
-                  {/* Encabezado de etapa */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="rounded-lg bg-accent p-2">
@@ -240,8 +287,7 @@ export default function StudentDashboard() {
                           ? <CheckCircle className="h-4 w-4 text-success" />
                           : stage.official_state === "NO_APROBADA"
                             ? <AlertCircle className="h-4 w-4 text-destructive" />
-                            : <Clock className="h-4 w-4 text-accent-foreground" />
-                        }
+                            : <Clock className="h-4 w-4 text-accent-foreground" />}
                       </div>
                       <div>
                         <p className="font-medium text-sm">{stageNameLabels[stageName]}</p>
@@ -251,29 +297,40 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 items-end">
-                      {stage.final_grade !== null && <Badge className="text-sm">Nota: {stage.final_grade}/100</Badge>}
-                    </div>
+                    {stage.final_grade !== null && <Badge className="text-sm">Nota: {stage.final_grade}/100</Badge>}
                   </div>
 
-                  {/* Observaciones de la etapa */}
                   {stage.observations && (
                     <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Observaciones de la etapa:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Observaciones:</p>
                       <p className="text-sm">{stage.observations}</p>
                     </div>
                   )}
 
-                  {/* Avales del director */}
+                  {/* Documentos subidos */}
+                  {submissions.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Documentos radicados:</p>
+                      {submissions.map((sub: any) => (
+                        <div key={sub.id} className="rounded-lg border p-2 text-sm flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-3 w-3 text-muted-foreground" />
+                            <Badge variant="outline" className="text-xs">v{sub.version}</Badge>
+                            {sub.external_url && <a href={sub.external_url} target="_blank" rel="noopener" className="text-primary underline text-xs">URL</a>}
+                            {sub.file_url && <a href={sub.file_url} target="_blank" rel="noopener" className="text-primary underline text-xs">Archivo</a>}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{new Date(sub.created_at).toLocaleDateString("es-CO")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {endorsements.length > 0 && (
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Aval del Director:</p>
                       {endorsements.map((end: any) => (
                         <div key={end.id} className="rounded-lg border p-2 text-sm flex items-start gap-2">
-                          {end.approved
-                            ? <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                            : <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                          }
+                          {end.approved ? <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" /> : <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
                           <div>
                             <p className="text-xs"><span className="font-medium">{end.user_profiles?.full_name}</span> — {end.approved ? "Avalado" : "Denegado"}</p>
                             {end.comments && <p className="text-xs text-muted-foreground mt-0.5">{end.comments}</p>}
@@ -283,7 +340,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Evaluaciones de jurados */}
                   {evals.length > 0 && (
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Evaluaciones de jurados:</p>
@@ -294,8 +350,7 @@ export default function StudentDashboard() {
                             <span className="font-medium text-xs">{ev.user_profiles?.full_name || "Jurado"}</span>
                             {ev.official_result && (
                               <Badge variant="outline" className="text-xs">
-                                {ev.official_result === "APROBADO" ? "Aprobado" :
-                                  ev.official_result === "APLAZADO_POR_MODIFICACIONES" ? "Con modificaciones" : "No aprobado"}
+                                {ev.official_result === "APROBADO" ? "Aprobado" : ev.official_result === "APLAZADO_POR_MODIFICACIONES" ? "Con modificaciones" : "No aprobado"}
                               </Badge>
                             )}
                           </div>
@@ -305,18 +360,42 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Acciones */}
-                  {actions.length > 0 && (
-                    <div className="flex gap-2 flex-wrap pt-1">
-                      {actions}
-                    </div>
-                  )}
+                  {actions.length > 0 && <div className="flex gap-2 flex-wrap pt-1">{actions}</div>}
                 </CardContent>
               </Card>
             );
           })}
         </div>
       </div>
+
+      {/* Upload Dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subir Documento — {uploadStage && stageNameLabels[uploadStage.stage_name]}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Enlace URL (Google Drive, etc.)</Label>
+              <Input type="url" value={uploadUrl} onChange={e => setUploadUrl(e.target.value)} placeholder="https://drive.google.com/..." />
+            </div>
+            <div className="space-y-2">
+              <Label>O subir archivo PDF</Label>
+              <Input type="file" accept=".pdf,.doc,.docx" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Notas adicionales</Label>
+              <Textarea value={uploadNotes} onChange={e => setUploadNotes(e.target.value)} placeholder="Notas opcionales" rows={3} />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={handleUploadDocument} disabled={uploading || (!uploadUrl && !uploadFile)}>
+                {uploading ? "Subiendo..." : "Radicar Documento"}
+              </Button>
+              <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
