@@ -345,6 +345,38 @@ export type Database = {
         }
         Relationships: []
       }
+      modality_configs: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          implemented: boolean
+          modality_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          implemented?: boolean
+          modality_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          implemented?: boolean
+          modality_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modality_configs_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: true
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programs: {
         Row: {
           created_at: string
