@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Clock, User, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Clock, User, FileText, CheckCircle, AlertCircle, Users } from "lucide-react";
 
 const eventIcons: Record<string, React.ElementType> = {
   PROJECT_CREATED: FileText,
@@ -17,10 +19,14 @@ const eventIcons: Record<string, React.ElementType> = {
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const { primaryRole } = useAuth();
+  const { toast } = useToast();
   const [project, setProject] = useState<any>(null);
   const [stages, setStages] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [directors, setDirectors] = useState<any[]>([]);
+  const [selectedDirector, setSelectedDirector] = useState("");
+  const [assigningDirector, setAssigningDirector] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,10 +35,10 @@ export default function ProjectDetail() {
 
   async function loadData() {
     const [projRes, stagesRes, membersRes, auditRes] = await Promise.all([
-      supabase.from("projects").select("*, programs(name), modalities(name)").eq("id", projectId!).maybeSingle(),
+      supabase.from("projects").select("*, programs(name), modalities(name), user_profiles!projects_director_id_fkey(full_name)").eq("id", projectId!).maybeSingle(),
       supabase.from("project_stages").select("*").eq("project_id", projectId!).order("created_at"),
       supabase.from("project_members").select("*, user_profiles(full_name, email)").eq("project_id", projectId!),
-      primaryRole === "COORDINATOR"
+      (primaryRole === "COORDINATOR" || primaryRole === "DECANO")
         ? supabase.from("audit_events").select("*").eq("project_id", projectId!).order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
     ]);
@@ -41,7 +47,48 @@ export default function ProjectDetail() {
     setStages(stagesRes.data || []);
     setMembers(membersRes.data || []);
     setAuditEvents(auditRes.data || []);
+
+    // Cargar directores disponibles si es coordinador y no tiene director
+    if (primaryRole === "COORDINATOR" && projRes.data && !projRes.data.director_id) {
+      const { data: dirRoles } = await supabase.from("user_roles").select("user_id").eq("role", "DIRECTOR");
+      if (dirRoles && dirRoles.length > 0) {
+        const { data: dirProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", dirRoles.map(r => r.user_id));
+        setDirectors(dirProfiles || []);
+      }
+    }
+
     setLoading(false);
+  }
+
+  async function handleAssignDirector() {
+    if (!selectedDirector || !projectId) return;
+    setAssigningDirector(true);
+    try {
+      const { error } = await supabase.from("projects").update({ director_id: selectedDirector }).eq("id", projectId);
+      if (error) throw error;
+
+      // Agregar como miembro del proyecto
+      await supabase.from("project_members").insert({
+        project_id: projectId,
+        user_id: selectedDirector,
+        role: "DIRECTOR" as any,
+      });
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("audit_events").insert({
+        project_id: projectId,
+        user_id: user?.id,
+        event_type: "DIRECTOR_ASSIGNED",
+        description: "Director asignado al proyecto",
+      });
+
+      toast({ title: "Director asignado exitosamente" });
+      loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setAssigningDirector(false);
+    }
   }
 
   if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
@@ -80,6 +127,45 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Director */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Director del Proyecto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {project.director_id ? (
+            <div className="flex items-center gap-3 text-sm">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span>{project.user_profiles?.full_name}</span>
+              <Badge variant="outline" className="text-xs">Director</Badge>
+            </div>
+          ) : primaryRole === "COORDINATOR" && directors.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Este proyecto no tiene director asignado.</p>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Select value={selectedDirector} onValueChange={setSelectedDirector}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar director" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {directors.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.full_name} ({d.email})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button size="sm" onClick={handleAssignDirector} disabled={!selectedDirector || assigningDirector} className="gap-1">
+                  <Users className="h-3 w-3" />Asignar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">Sin director asignado</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Members */}
       <Card>
@@ -122,7 +208,7 @@ export default function ProjectDetail() {
         </CardContent>
       </Card>
 
-      {/* Audit trail (coordinator only) */}
+      {/* Audit trail (coordinator/decano) */}
       {auditEvents.length > 0 && (
         <Card>
           <CardHeader>
