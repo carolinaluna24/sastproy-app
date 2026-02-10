@@ -16,6 +16,14 @@ import EndorseAnteproject from "./pages/anteproyecto/EndorseAnteproject";
 import AssignJurors from "./pages/anteproyecto/AssignJurors";
 import EvaluateAnteproject from "./pages/anteproyecto/EvaluateAnteproject";
 import ConsolidateAnteproject from "./pages/anteproyecto/ConsolidateAnteproject";
+import SubmitInformeFinal from "./pages/informe-final/SubmitInformeFinal";
+import EndorseInformeFinal from "./pages/informe-final/EndorseInformeFinal";
+import AssignJurorsInformeFinal from "./pages/informe-final/AssignJurorsInformeFinal";
+import EvaluateInformeFinal from "./pages/informe-final/EvaluateInformeFinal";
+import ConsolidateInformeFinal from "./pages/informe-final/ConsolidateInformeFinal";
+import ScheduleDefense from "./pages/sustentacion/ScheduleDefense";
+import RecordDefenseResult from "./pages/sustentacion/RecordDefenseResult";
+import SubmitFinalDelivery from "./pages/sustentacion/SubmitFinalDelivery";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,12 +43,23 @@ const App = () => (
             <Route path="/projects/:projectId" element={<ProjectDetail />} />
             <Route path="/projects/:projectId/submit-proposal" element={<SubmitProposal />} />
             <Route path="/projects/:projectId/submit-anteproject" element={<SubmitAnteproject />} />
+            <Route path="/projects/:projectId/submit-informe-final" element={<SubmitInformeFinal />} />
+            <Route path="/projects/:projectId/submit-final-delivery" element={<SubmitFinalDelivery />} />
             <Route path="/proposals" element={<ProposalsList />} />
             <Route path="/proposals/:stageId/evaluate" element={<EvaluateProposal />} />
+            {/* Anteproyecto */}
             <Route path="/anteproyecto/:stageId/endorse" element={<EndorseAnteproject />} />
             <Route path="/anteproyecto/:stageId/assign-jurors" element={<AssignJurors />} />
             <Route path="/anteproyecto/:stageId/evaluate" element={<EvaluateAnteproject />} />
             <Route path="/anteproyecto/:stageId/consolidate" element={<ConsolidateAnteproject />} />
+            {/* Informe Final */}
+            <Route path="/informe-final/:stageId/endorse" element={<EndorseInformeFinal />} />
+            <Route path="/informe-final/:stageId/assign-jurors" element={<AssignJurorsInformeFinal />} />
+            <Route path="/informe-final/:stageId/evaluate" element={<EvaluateInformeFinal />} />
+            <Route path="/informe-final/:stageId/consolidate" element={<ConsolidateInformeFinal />} />
+            {/* Sustentación */}
+            <Route path="/sustentacion/:stageId/schedule" element={<ScheduleDefense />} />
+            <Route path="/sustentacion/:stageId/record-result" element={<RecordDefenseResult />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
