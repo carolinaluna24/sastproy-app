@@ -29,6 +29,11 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
     { label: "Asignaciones", path: "/dashboard", icon: Clock },
     { label: "Catálogo", path: "/catalog", icon: BookOpen },
   ],
+  DECANO: [
+    { label: "Indicadores", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Reportes", path: "/reports", icon: BarChart3 },
+    { label: "Catálogo", path: "/catalog", icon: BookOpen },
+  ],
 };
 
 export default function AppLayout() {
@@ -55,6 +60,7 @@ export default function AppLayout() {
     COORDINATOR: "Coordinador",
     DIRECTOR: "Director",
     JUROR: "Jurado",
+    DECANO: "Directivo",
   };
 
   const handleSignOut = async () => {

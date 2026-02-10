@@ -3,6 +3,7 @@ import StudentDashboard from "./dashboard/StudentDashboard";
 import CoordinatorDashboard from "./dashboard/CoordinatorDashboard";
 import DirectorDashboard from "./dashboard/DirectorDashboard";
 import JurorDashboard from "./dashboard/JurorDashboard";
+import DecanoDashboard from "./dashboard/DecanoDashboard";
 
 export default function Dashboard() {
   const { primaryRole } = useAuth();
@@ -16,6 +17,8 @@ export default function Dashboard() {
       return <DirectorDashboard />;
     case "JUROR":
       return <JurorDashboard />;
+    case "DECANO":
+      return <DecanoDashboard />;
     default:
       return <div className="py-8 text-center text-muted-foreground">Sin rol asignado</div>;
   }
