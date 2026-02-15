@@ -40,9 +40,7 @@ export default function Login() {
             <GraduationCap className="h-7 w-7" />
           </div>
           <CardTitle className="text-xl font-bold">Sistema de Trabajo de Grado</CardTitle>
-          <CardDescription>
-            Seguimiento y Trazabilidad de Proyectos
-          </CardDescription>
+          <CardDescription>Seguimiento y Trazabilidad de Proyectos</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -52,6 +50,7 @@ export default function Login() {
                 id="email"
                 type="email"
                 value={email}
+                value="coordinator@test.com"
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="correo@ejemplo.com"
                 required
@@ -63,6 +62,7 @@ export default function Login() {
                 id="password"
                 type="password"
                 value={password}
+                value="Test1234!"
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
