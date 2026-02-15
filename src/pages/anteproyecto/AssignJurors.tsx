@@ -103,9 +103,14 @@ export default function AssignJurors() {
       dueDate.setDate(dueDate.getDate() + 15);
 
       // MODDDD
-      toast({ title: "Mensaje", description: "Jurado1: " + juror1 + "Jurado2:" + juror2, variant: "destructive" });
+      toast({
+        title: "Mensaje",
+        description: "Proyecto: " + project.id + " - Jurado1: " + juror1 + " - Jurado2:" + juror2,
+        variant: "destructive",
+      });
       //*******************
       // Insertar las 2 asignaciones
+      /*
       const { error } = await supabase.from("assignments").insert([
         {
           project_id: project.id,
@@ -122,6 +127,7 @@ export default function AssignJurors() {
           due_date: dueDate.toISOString(),
         },
       ]);
+      */
       if (error) throw error;
 
       // Actualizar estado de la etapa a EN_REVISION
