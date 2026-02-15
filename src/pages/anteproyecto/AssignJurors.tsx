@@ -103,7 +103,7 @@ export default function AssignJurors() {
       dueDate.setDate(dueDate.getDate() + 15);
 
       //*****************
-      toast({ title: "Mensaje", description: project, variant: "destructive" });
+      toast({ title: "Mensaje", description: "Jurado1: " + juror1, variant: "destructive" });
       //******************
 
       /*
