@@ -25,6 +25,8 @@ interface UserRow {
   email: string;
   phone: string | null;
   program_id: string | null;
+  id_type: string | null;
+  id_number: string | null;
   role: string | null;
 }
 
@@ -40,6 +42,8 @@ export default function ManageUsers() {
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editIdType, setEditIdType] = useState("");
+  const [editIdNumber, setEditIdNumber] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editProgramId, setEditProgramId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -51,7 +55,7 @@ export default function ManageUsers() {
   async function loadData() {
     setLoading(true);
     const [usersRes, rolesRes, programsRes] = await Promise.all([
-      supabase.from("user_profiles").select("id, full_name, email, phone, program_id"),
+      supabase.from("user_profiles").select("id, full_name, email, phone, program_id, id_type, id_number"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("programs").select("id, name"),
     ]);
@@ -76,6 +80,8 @@ export default function ManageUsers() {
     setEditFullName(user.full_name);
     setEditEmail(user.email);
     setEditPhone(user.phone || "");
+    setEditIdType(user.id_type || "");
+    setEditIdNumber(user.id_number || "");
     setEditRole(user.role || "");
     setEditProgramId(user.program_id || "");
     setEditOpen(true);
@@ -96,6 +102,8 @@ export default function ManageUsers() {
           full_name: editFullName.trim(),
           email: editEmail.trim(),
           phone: editPhone.trim() || null,
+          id_type: editIdType || null,
+          id_number: editIdNumber.trim() || null,
           role: editRole,
           program_id: editProgramId || null,
         },
@@ -126,6 +134,12 @@ export default function ManageUsers() {
 
   const getRoleLabel = (role: string | null) => ROLES.find((r) => r.value === role)?.label || "Sin rol";
   const getProgramName = (pid: string | null) => programs.find((p) => p.id === pid)?.name || "—";
+  const getIdTypeLabel = (t: string | null) => {
+    if (t === "CC") return "CC";
+    if (t === "TI") return "TI";
+    if (t === "CE") return "CE";
+    return "—";
+  };
 
   if (loading) return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando...</div>;
 
@@ -157,6 +171,7 @@ export default function ManageUsers() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead>Documento</TableHead>
                 <TableHead>Correo</TableHead>
                 <TableHead>Teléfono</TableHead>
                 <TableHead>Rol</TableHead>
@@ -168,6 +183,7 @@ export default function ManageUsers() {
               {filtered.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-sm">{u.full_name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{u.id_type && u.id_number ? `${getIdTypeLabel(u.id_type)} ${u.id_number}` : "—"}</TableCell>
                   <TableCell className="text-sm">{u.email}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.phone || "—"}</TableCell>
                   <TableCell>
@@ -183,7 +199,7 @@ export default function ManageUsers() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No se encontraron usuarios
                   </TableCell>
                 </TableRow>
@@ -230,6 +246,29 @@ export default function ManageUsers() {
                 onChange={(e) => setEditPhone(e.target.value)}
                 maxLength={20}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de documento</Label>
+                <Select value={editIdType} onValueChange={setEditIdType}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                    <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                    <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editIdNumber">Número de documento</Label>
+                <Input
+                  id="editIdNumber"
+                  value={editIdNumber}
+                  onChange={(e) => setEditIdNumber(e.target.value)}
+                  maxLength={20}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
