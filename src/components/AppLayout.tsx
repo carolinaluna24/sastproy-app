@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
-import { useNavigate, Outlet, Link, useLocation } from "react-router-dom";
+import { useNavigate, Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus } from "lucide-react";
 
@@ -51,8 +51,7 @@ export default function AppLayout() {
   }
 
   if (!user) {
-    navigate("/login");
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   const items = primaryRole ? navItems[primaryRole] || [] : [];
@@ -65,7 +64,11 @@ export default function AppLayout() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // Si el token ya expiró, limpiar la sesión localmente
+    }
     navigate("/login");
   };
 
