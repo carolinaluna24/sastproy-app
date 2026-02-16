@@ -19,6 +19,8 @@ const ROLES = [
 export default function CreateUser() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [idType, setIdType] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +38,7 @@ export default function CreateUser() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim() || !role) {
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim() || !role || !idType || !idNumber.trim()) {
       toast({ title: "Error", description: "Todos los campos marcados son obligatorios.", variant: "destructive" });
       return;
     }
@@ -57,6 +59,8 @@ export default function CreateUser() {
           password,
           full_name: `${firstName.trim()} ${lastName.trim()}`,
           phone: phone.trim() || null,
+          id_type: idType || null,
+          id_number: idNumber.trim() || null,
           role,
           program_id: programId || null,
         },
@@ -74,6 +78,8 @@ export default function CreateUser() {
       toast({ title: "Usuario creado", description: `${firstName} ${lastName} fue registrado como ${ROLES.find(r => r.value === role)?.label}.` });
       setFirstName("");
       setLastName("");
+      setIdType("");
+      setIdNumber("");
       setPhone("");
       setEmail("");
       setPassword("");
@@ -109,6 +115,24 @@ export default function CreateUser() {
               <div className="space-y-2">
                 <Label htmlFor="lastName">Apellidos *</Label>
                 <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ej: García López" maxLength={100} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de documento *</Label>
+                <Select value={idType} onValueChange={setIdType}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                    <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                    <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="idNumber">Número de documento *</Label>
+                <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Ej: 1234567890" maxLength={20} />
               </div>
             </div>
 
