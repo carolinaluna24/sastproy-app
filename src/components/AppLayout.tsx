@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import { useNavigate, Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus, Users } from "lucide-react";
 
 /**
  * Ítems de navegación organizados por rol.
@@ -18,6 +18,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
     { label: "Proyectos", path: "/dashboard", icon: LayoutDashboard },
     { label: "Propuestas", path: "/proposals", icon: FileCheck },
     { label: "Crear Usuario", path: "/users/new", icon: UserPlus },
+    { label: "Editar Usuarios", path: "/users", icon: Users },
     { label: "Reportes", path: "/reports", icon: BarChart3 },
     { label: "Catálogo", path: "/catalog", icon: BookOpen },
     { label: "Escalabilidad", path: "/about/scalability", icon: Info },
