@@ -87,6 +87,7 @@ export default function CreateProject() {
 
     try {
       // 1. Crear el proyecto en la tabla projects
+      console.log("Creating project with:", { title, description, programId, modalityId, userId: user.id });
       const { data: project, error: projErr } = await supabase
         .from("projects")
         .insert({
@@ -99,7 +100,10 @@ export default function CreateProject() {
         .select()
         .single();
 
-      if (projErr) throw projErr;
+      if (projErr) {
+        console.error("Project insert error:", JSON.stringify(projErr));
+        throw projErr;
+      }
 
       // 2. Agregar al creador como AUTOR del proyecto
       const { error: memberErr } = await supabase
