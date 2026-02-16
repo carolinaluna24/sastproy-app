@@ -187,7 +187,7 @@ export default function ProjectDetail() {
           <CardTitle className="text-sm">Integrantes</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {members.map((m) => (
+          {members.filter((m) => m.role === "AUTHOR").map((m) => (
             <div key={m.id} className="flex items-center gap-3 text-sm">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>{m.user_profiles?.full_name || m.user_profiles?.email}</span>
