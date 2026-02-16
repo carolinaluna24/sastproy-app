@@ -49,7 +49,7 @@ export default function ProjectDetail() {
     setAuditEvents(auditRes.data || []);
 
     // Cargar directores disponibles si es coordinador y no tiene director
-    if (primaryRole === "COORDINATOR" && projRes.data && !projRes.data.director_id) {
+    if (primaryRole === "COORDINATOR" && projRes.data) {
       const { data: dirRoles } = await supabase.from("user_roles").select("user_id").eq("role", "DIRECTOR");
       if (dirRoles && dirRoles.length > 0) {
         const { data: dirProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", dirRoles.map(r => r.user_id));
@@ -133,16 +133,19 @@ export default function ProjectDetail() {
         <CardHeader>
           <CardTitle className="text-sm">Director del Proyecto</CardTitle>
         </CardHeader>
-        <CardContent>
-          {project.director_id ? (
+        <CardContent className="space-y-3">
+          {project.director_id && (
             <div className="flex items-center gap-3 text-sm">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>{project.user_profiles?.full_name}</span>
               <Badge variant="outline" className="text-xs">Director</Badge>
             </div>
-          ) : primaryRole === "COORDINATOR" && directors.length > 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Este proyecto no tiene director asignado.</p>
+          )}
+          {primaryRole === "COORDINATOR" && directors.length > 0 && (
+            <div className="space-y-2">
+              {!project.director_id && (
+                <p className="text-sm text-muted-foreground">Este proyecto no tiene director asignado.</p>
+              )}
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
                   <Select value={selectedDirector} onValueChange={setSelectedDirector}>
@@ -157,11 +160,12 @@ export default function ProjectDetail() {
                   </Select>
                 </div>
                 <Button size="sm" onClick={handleAssignDirector} disabled={!selectedDirector || assigningDirector} className="gap-1">
-                  <Users className="h-3 w-3" />Asignar
+                  <Users className="h-3 w-3" />{project.director_id ? "Cambiar" : "Asignar"}
                 </Button>
               </div>
             </div>
-          ) : (
+          )}
+          {!project.director_id && primaryRole !== "COORDINATOR" && (
             <p className="text-sm text-muted-foreground italic">Sin director asignado</p>
           )}
         </CardContent>
