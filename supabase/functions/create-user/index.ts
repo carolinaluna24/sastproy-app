@@ -54,18 +54,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, full_name, phone, role, program_id, id_type, id_number } = await req.json();
+    const { email, password, full_name, phone, role, roles, program_id, id_type, id_number } = await req.json();
 
-    if (!email || !password || !full_name || !role) {
-      return new Response(JSON.stringify({ error: "Campos requeridos: email, password, full_name, role" }), {
+    // Support both single role (legacy) and multiple roles
+    const roleList: string[] = roles && Array.isArray(roles) ? roles : role ? [role] : [];
+
+    if (!email || !password || !full_name || roleList.length === 0) {
+      return new Response(JSON.stringify({ error: "Campos requeridos: email, password, full_name, al menos un rol" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const validRoles = ["STUDENT", "COORDINATOR", "DIRECTOR", "JUROR", "DECANO"];
-    if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ error: "Rol inválido" }), {
+    const invalidRole = roleList.find((r: string) => !validRoles.includes(r));
+    if (invalidRole) {
+      return new Response(JSON.stringify({ error: `Rol inválido: ${invalidRole}` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -101,11 +105,9 @@ Deno.serve(async (req) => {
       await adminClient.from("user_profiles").update(profileUpdate).eq("id", userId);
     }
 
-    // Assign role
-    const { error: roleError } = await adminClient.from("user_roles").insert({
-      user_id: userId,
-      role,
-    });
+    // Assign roles
+    const roleInserts = roleList.map((r: string) => ({ user_id: userId, role: r }));
+    const { error: roleError } = await adminClient.from("user_roles").insert(roleInserts);
 
     if (roleError) {
       return new Response(JSON.stringify({ error: roleError.message }), {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,7 +28,7 @@ interface UserRow {
   program_id: string | null;
   id_type: string | null;
   id_number: string | null;
-  role: string | null;
+  roles: string[];
 }
 
 export default function ManageUsers() {
@@ -44,7 +45,7 @@ export default function ManageUsers() {
   const [editPhone, setEditPhone] = useState("");
   const [editIdType, setEditIdType] = useState("");
   const [editIdNumber, setEditIdNumber] = useState("");
-  const [editRole, setEditRole] = useState("");
+  const [editSelectedRoles, setEditSelectedRoles] = useState<string[]>([]);
   const [editProgramId, setEditProgramId] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -60,14 +61,15 @@ export default function ManageUsers() {
       supabase.from("programs").select("id, name"),
     ]);
 
-    const rolesMap: Record<string, string> = {};
+    const rolesMap: Record<string, string[]> = {};
     (rolesRes.data || []).forEach((r: any) => {
-      rolesMap[r.user_id] = r.role;
+      if (!rolesMap[r.user_id]) rolesMap[r.user_id] = [];
+      rolesMap[r.user_id].push(r.role);
     });
 
     const merged = (usersRes.data || []).map((u: any) => ({
       ...u,
-      role: rolesMap[u.id] || null,
+      roles: rolesMap[u.id] || [],
     }));
 
     setUsers(merged);
@@ -82,15 +84,21 @@ export default function ManageUsers() {
     setEditPhone(user.phone || "");
     setEditIdType(user.id_type || "");
     setEditIdNumber(user.id_number || "");
-    setEditRole(user.role || "");
+    setEditSelectedRoles(user.roles);
     setEditProgramId(user.program_id || "");
     setEditOpen(true);
   }
 
+  function toggleEditRole(role: string) {
+    setEditSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  }
+
   async function handleSave() {
     if (!editUser) return;
-    if (!editFullName.trim() || !editEmail.trim() || !editRole) {
-      toast({ title: "Error", description: "Nombre, correo y rol son obligatorios.", variant: "destructive" });
+    if (!editFullName.trim() || !editEmail.trim() || editSelectedRoles.length === 0) {
+      toast({ title: "Error", description: "Nombre, correo y al menos un rol son obligatorios.", variant: "destructive" });
       return;
     }
 
@@ -104,7 +112,7 @@ export default function ManageUsers() {
           phone: editPhone.trim() || null,
           id_type: editIdType || null,
           id_number: editIdNumber.trim() || null,
-          role: editRole,
+          roles: editSelectedRoles,
           program_id: editProgramId || null,
         },
       });
@@ -128,7 +136,7 @@ export default function ManageUsers() {
     return (
       u.full_name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
-      (u.role || "").toLowerCase().includes(q)
+      u.roles.some((r) => r.toLowerCase().includes(q))
     );
   });
 
@@ -187,7 +195,11 @@ export default function ManageUsers() {
                   <TableCell className="text-sm">{u.email}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.phone || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">{getRoleLabel(u.role)}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {u.roles.length > 0 ? u.roles.map((r) => (
+                        <Badge key={r} variant="outline" className="text-xs">{getRoleLabel(r)}</Badge>
+                      )) : <span className="text-muted-foreground text-xs">Sin rol</span>}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{getProgramName(u.program_id)}</TableCell>
                   <TableCell>
@@ -272,15 +284,18 @@ export default function ManageUsers() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rol *</Label>
-              <Select value={editRole} onValueChange={setEditRole}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Roles * <span className="text-muted-foreground font-normal">(selecciona uno o más)</span></Label>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {ROLES.map((r) => (
+                  <label key={r.value} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={editSelectedRoles.includes(r.value)}
+                      onCheckedChange={() => toggleEditRole(r.value)}
+                    />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
