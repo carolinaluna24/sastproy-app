@@ -9,6 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 type OfficialState = "APROBADA" | "APROBADA_CON_MODIFICACIONES" | "NO_APROBADA";
 
@@ -25,6 +31,7 @@ export default function EvaluateProposal() {
   const [observations, setObservations] = useState("");
   const [directorId, setDirectorId] = useState("");
   const [directors, setDirectors] = useState<any[]>([]);
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -77,6 +84,10 @@ export default function EvaluateProposal() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !stage || !result) return;
+    if (result === "APROBADA_CON_MODIFICACIONES" && !dueDate) {
+      toast({ title: "Selecciona una fecha límite para las correcciones", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -117,16 +128,8 @@ export default function EvaluateProposal() {
         });
       }
 
-      // Si APROBADA_CON_MODIFICACIONES, crear deadline de 5 días hábiles
-      if (result === "APROBADA_CON_MODIFICACIONES") {
-        const dueDate = new Date();
-        let businessDays = 0;
-        while (businessDays < 5) {
-          dueDate.setDate(dueDate.getDate() + 1);
-          const day = dueDate.getDay();
-          if (day !== 0 && day !== 6) businessDays++;
-        }
-
+      // Si APROBADA_CON_MODIFICACIONES, crear deadline con la fecha seleccionada
+      if (result === "APROBADA_CON_MODIFICACIONES" && dueDate) {
         await supabase.from("deadlines").insert({
           project_stage_id: stage.id,
           description: "Plazo para correcciones de propuesta",
@@ -241,8 +244,32 @@ export default function EvaluateProposal() {
             )}
 
             {result === "APROBADA_CON_MODIFICACIONES" && (
-              <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
-                Se creará un plazo de 5 días hábiles para las correcciones.
+              <div className="space-y-2">
+                <Label>Fecha límite para correcciones <span className="text-destructive">*</span></Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={setDueDate}
+                      disabled={(date) => date <= new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  Se creará un plazo hasta esta fecha para que el estudiante radique las correcciones.
+                </p>
               </div>
             )}
 
