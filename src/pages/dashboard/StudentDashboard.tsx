@@ -368,7 +368,7 @@ export default function StudentDashboard() {
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Documentos radicados:</p>
                       {submissions.map((sub: any) => {
-                        const canEdit = ["BORRADOR", "RADICADA", "CON_OBSERVACIONES"].includes(stage.system_state);
+                        const canEdit = ["BORRADOR", "CON_OBSERVACIONES"].includes(stage.system_state);
                         return (
                           <div key={sub.id} className="rounded-lg border p-2 text-sm flex items-center justify-between">
                             <div className="flex items-center gap-2">
