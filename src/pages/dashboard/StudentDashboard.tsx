@@ -67,6 +67,9 @@ export default function StudentDashboard() {
   const [editing, setEditing] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
+  // Signed URL cache: maps storage path -> temporary URL
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
   useEffect(() => { if (user) loadProject(); }, [user]);
 
   async function loadProject() {
@@ -150,6 +153,21 @@ export default function StudentDashboard() {
     setLoading(false);
   }
 
+  /** Genera una signed URL temporal (1 hora) para un path del bucket privado */
+  async function getSignedUrl(path: string): Promise<string | null> {
+    if (signedUrls[path]) return signedUrls[path];
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) return null;
+    setSignedUrls(prev => ({ ...prev, [path]: data.signedUrl }));
+    return data.signedUrl;
+  }
+
+  async function openFileUrl(path: string) {
+    const url = await getSignedUrl(path);
+    if (url) window.open(url, "_blank", "noopener");
+    else toast({ title: "No se pudo abrir el archivo", variant: "destructive" });
+  }
+
   async function handleUploadDocument() {
     if (!user || !project || !uploadStage) return;
     setUploading(true);
@@ -157,14 +175,13 @@ export default function StudentDashboard() {
     try {
       let fileUrl: string | null = null;
 
-      // Upload file to storage if provided
+      // Upload file to storage if provided — store the path, not the public URL
       if (uploadFile) {
         const ext = uploadFile.name.split(".").pop();
-        const path = `${user.id}/${project.id}/${uploadStage.id}/${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from("documents").upload(path, uploadFile);
+        const storagePath = `${user.id}/${project.id}/${uploadStage.id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("documents").upload(storagePath, uploadFile);
         if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-        fileUrl = urlData.publicUrl;
+        fileUrl = storagePath; // store path, not public URL
       }
 
       const { count } = await supabase.from("submissions")
@@ -212,11 +229,10 @@ export default function StudentDashboard() {
 
       if (editFile) {
         const ext = editFile.name.split(".").pop();
-        const path = `${user.id}/${project.id}/${editSubmission.project_stage_id}/${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from("documents").upload(path, editFile);
+        const storagePath = `${user.id}/${project.id}/${editSubmission.project_stage_id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("documents").upload(storagePath, editFile);
         if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-        fileUrl = urlData.publicUrl;
+        fileUrl = storagePath; // store path, not public URL
       }
 
       const { error } = await supabase.from("submissions").update({
@@ -445,7 +461,11 @@ export default function StudentDashboard() {
                               <FileText className="h-3 w-3 text-muted-foreground" />
                               <Badge variant="outline" className="text-xs">v{sub.version}</Badge>
                               {sub.external_url && <a href={sub.external_url} target="_blank" rel="noopener" className="text-primary underline text-xs">URL</a>}
-                              {sub.file_url && <a href={sub.file_url} target="_blank" rel="noopener" className="text-primary underline text-xs">Archivo</a>}
+                              {sub.file_url && (
+                                <button onClick={() => openFileUrl(sub.file_url)} className="text-primary underline text-xs cursor-pointer">
+                                  Archivo
+                                </button>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {canEdit && (
@@ -548,7 +568,12 @@ export default function StudentDashboard() {
               <Label>Reemplazar archivo PDF</Label>
               <Input type="file" accept=".pdf,.doc,.docx" onChange={e => setEditFile(e.target.files?.[0] || null)} />
               {editSubmission?.file_url && !editFile && (
-                <p className="text-xs text-muted-foreground">Archivo actual: <a href={editSubmission.file_url} target="_blank" rel="noopener" className="text-primary underline">Ver archivo</a></p>
+                <p className="text-xs text-muted-foreground">
+                  Archivo actual:{" "}
+                  <button onClick={() => openFileUrl(editSubmission.file_url)} className="text-primary underline cursor-pointer">
+                    Ver archivo
+                  </button>
+                </p>
               )}
             </div>
             <div className="space-y-2">
