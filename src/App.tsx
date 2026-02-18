@@ -32,6 +32,7 @@ import CatalogProjectDetail from "./pages/catalog/CatalogProjectDetail";
 import Scalability from "./pages/about/Scalability";
 import CreateUser from "./pages/users/CreateUser";
 import ManageUsers from "./pages/users/ManageUsers";
+import ChangePassword from "./pages/settings/ChangePassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +81,8 @@ const App = () => (
             <Route path="/users" element={<ManageUsers />} />
             {/* Información */}
             <Route path="/about/scalability" element={<Scalability />} />
+            {/* Configuración */}
+            <Route path="/settings/password" element={<ChangePassword />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
