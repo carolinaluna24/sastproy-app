@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, Eye, Send, Upload, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, AlertTriangle, Eye, Send, Upload, Pencil } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   VIGENTE: "bg-success text-success-foreground",
@@ -47,6 +48,7 @@ export default function StudentDashboard() {
   const [submissionsByStage, setSubmissionsByStage] = useState<Record<string, any[]>>({});
   const [evaluationsByStage, setEvaluationsByStage] = useState<Record<string, any[]>>({});
   const [endorsementsByStage, setEndorsementsByStage] = useState<Record<string, any[]>>({});
+  const [deadlinesByStage, setDeadlinesByStage] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   // Upload dialog state
@@ -88,6 +90,7 @@ export default function StudentDashboard() {
         const evalMap: Record<string, any[]> = {};
         const endorseMap: Record<string, any[]> = {};
         const subsMap: Record<string, any[]> = {};
+        const deadlineMap: Record<string, any> = {};
 
         for (const stage of stagesList) {
           const { data: subs } = await supabase
@@ -107,10 +110,41 @@ export default function StudentDashboard() {
               .in("submission_id", subIds);
             endorseMap[stage.id] = endorsements || [];
           }
+
+          // Cargar deadline para etapas CON_OBSERVACIONES
+          if (stage.system_state === "CON_OBSERVACIONES") {
+            const { data: deadlines } = await supabase
+              .from("deadlines")
+              .select("*")
+              .eq("project_stage_id", stage.id)
+              .order("created_at", { ascending: false })
+              .limit(1);
+            if (deadlines && deadlines.length > 0) {
+              deadlineMap[stage.id] = deadlines[0];
+
+              // Si la fecha límite ya venció, actualizar la etapa a NO_APROBADA / CERRADA
+              const now = new Date();
+              const due = new Date(deadlines[0].due_date);
+              if (due < now) {
+                await supabase.from("project_stages").update({
+                  system_state: "CERRADA",
+                  official_state: "NO_APROBADA",
+                }).eq("id", stage.id);
+                await supabase.from("audit_events").insert({
+                  project_id: proj.id,
+                  user_id: user!.id,
+                  event_type: "STAGE_EXPIRED",
+                  description: `Etapa ${stage.stage_name} marcada como NO_APROBADA por vencimiento del plazo de correcciones`,
+                  metadata: { stage_id: stage.id },
+                });
+              }
+            }
+          }
         }
         setSubmissionsByStage(subsMap);
         setEvaluationsByStage(evalMap);
         setEndorsementsByStage(endorseMap);
+        setDeadlinesByStage(deadlineMap);
       }
     }
     setLoading(false);
@@ -331,6 +365,7 @@ export default function StudentDashboard() {
             const evals = evaluationsByStage[stage.id] || [];
             const endorsements = endorsementsByStage[stage.id] || [];
             const submissions = submissionsByStage[stage.id] || [];
+            const deadline = deadlinesByStage[stage.id];
             const actions = getStageActions(stage);
 
             return (
@@ -362,6 +397,41 @@ export default function StudentDashboard() {
                       <p className="text-sm">{stage.observations}</p>
                     </div>
                   )}
+
+                  {/* Alerta de fecha límite para correcciones */}
+                  {stage.system_state === "CON_OBSERVACIONES" && deadline && (() => {
+                    const due = new Date(deadline.due_date);
+                    const now = new Date();
+                    const diffMs = due.getTime() - now.getTime();
+                    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    const isUrgent = daysLeft <= 2 && daysLeft >= 0;
+                    const isOverdue = daysLeft < 0;
+                    return (
+                      <Alert variant={isOverdue ? "destructive" : "default"} className={isUrgent && !isOverdue ? "border-warning bg-warning/10" : ""}>
+                        <AlertTriangle className={`h-4 w-4 ${isOverdue ? "" : isUrgent ? "text-warning" : "text-primary"}`} />
+                        <AlertTitle className="text-sm font-semibold">
+                          {isOverdue
+                            ? "Plazo de correcciones vencido"
+                            : "Debes radicar las correcciones antes de:"}
+                        </AlertTitle>
+                        <AlertDescription className="text-xs mt-1">
+                          {isOverdue ? (
+                            <span>El plazo venció el <strong>{due.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}</strong>. La etapa será marcada como <strong>No Aprobada</strong>.</span>
+                          ) : (
+                            <span>
+                              <strong>{due.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}</strong>
+                              {" — "}
+                              {daysLeft === 0
+                                ? <span className="font-semibold text-destructive">¡Vence hoy!</span>
+                                : daysLeft === 1
+                                  ? <span className="font-semibold text-warning">Queda 1 día</span>
+                                  : <span>Quedan <strong>{daysLeft} días</strong></span>}
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })()}
 
                   {/* Documentos subidos */}
                   {submissions.length > 0 && (
