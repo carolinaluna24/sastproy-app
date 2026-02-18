@@ -6,7 +6,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { CheckCircle, AlertTriangle, XCircle, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const resultLabels: Record<string, string> = {
   APROBADO: "Aprobado",
@@ -31,6 +37,7 @@ export default function ConsolidateInformeFinal() {
   const [project, setProject] = useState<any>(null);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [consolidatedResult, setConsolidatedResult] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +65,10 @@ export default function ConsolidateInformeFinal() {
 
   async function handleConsolidate() {
     if (!user || !stage || !consolidatedResult) return;
+    if (consolidatedResult === "APROBADA_CON_MODIFICACIONES" && !dueDate) {
+      toast({ title: "Selecciona una fecha límite para las correcciones", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       // Si APROBADA_CON_MODIFICACIONES, se deja en CON_OBSERVACIONES para que el estudiante pueda radicar la versión 2
@@ -71,13 +82,11 @@ export default function ConsolidateInformeFinal() {
       }).eq("id", stage.id);
       if (error) throw error;
 
-      // Si APLAZADO => deadline 10 días
-      if (consolidatedResult === "APROBADA_CON_MODIFICACIONES") {
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 10);
+      // Si APLAZADO => deadline con la fecha seleccionada
+      if (consolidatedResult === "APROBADA_CON_MODIFICACIONES" && dueDate) {
         await supabase.from("deadlines").insert({
           project_stage_id: stage.id,
-          description: "Plazo para correcciones del informe final (10 días calendario)",
+          description: "Plazo para correcciones del informe final",
           due_date: dueDate.toISOString(),
           created_by: user.id,
         });
@@ -152,7 +161,35 @@ export default function ConsolidateInformeFinal() {
           <CardContent className="space-y-4">
             <div className="rounded-lg bg-accent p-4 text-center">
               <p className="text-lg font-bold">{consolidatedResult.replace(/_/g, " ")}</p>
-              {consolidatedResult === "APROBADA_CON_MODIFICACIONES" && <p className="text-sm text-muted-foreground mt-1">Se creará un plazo de 10 días calendario para correcciones.</p>}
+              {consolidatedResult === "APROBADA_CON_MODIFICACIONES" && (
+                <div className="mt-3 space-y-2 text-left">
+                  <Label>Fecha límite para correcciones <span className="text-destructive">*</span></Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "PPP", { locale: es }) : "Seleccionar fecha límite"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        disabled={(date) => date <= new Date()}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Se creará un plazo hasta esta fecha para que el estudiante radique las correcciones.
+                  </p>
+                </div>
+              )}
               {consolidatedResult === "APROBADA" && <p className="text-sm text-muted-foreground mt-1">Se habilitará la etapa SUSTENTACIÓN automáticamente.</p>}
             </div>
             {stage.official_state !== "PENDIENTE" ? (
