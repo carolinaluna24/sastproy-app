@@ -244,8 +244,8 @@ export default function ProjectDetail() {
                     <p className="text-xs text-muted-foreground mt-1">📝 {s.observations}</p>
                   )}
                   {deadline && dueDate && (
-                    <div className={`flex items-center gap-1.5 mt-2 text-xs rounded-md px-2 py-1 w-fit ${isOverdue ? "bg-destructive/10 text-destructive" : daysLeft !== null && daysLeft <= 2 ? "bg-warning/10 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
-                      <CalendarClock className="h-3 w-3 shrink-0" />
+                    <div className={`flex items-center gap-1.5 mt-2 text-sm font-medium rounded-md px-3 py-1.5 w-fit border ${isOverdue ? "bg-destructive text-destructive-foreground border-destructive" : daysLeft !== null && daysLeft <= 2 ? "bg-destructive/15 text-destructive border-destructive/40" : "bg-primary/10 text-primary border-primary/30"}`}>
+                      <CalendarClock className="h-3.5 w-3.5 shrink-0" />
                       <span>
                         <span className="font-medium">Fecha límite correcciones:</span>{" "}
                         {dueDate.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}
