@@ -148,24 +148,25 @@ export default function StudentDashboard() {
         setEvaluationsByStage(evalMap);
         setEndorsementsByStage(endorseMap);
         setDeadlinesByStage(deadlineMap);
+
+        // Pre-cargar signed URLs para todos los archivos
+        const allPaths = Object.values(subsMap)
+          .flat()
+          .map((s: any) => s.file_url)
+          .filter(Boolean);
+        if (allPaths.length > 0) {
+          const results = await Promise.all(
+            allPaths.map((path: string) => supabase.storage.from("documents").createSignedUrl(path, 3600))
+          );
+          const urlMap: Record<string, string> = {};
+          results.forEach((res, i) => {
+            if (res.data?.signedUrl) urlMap[allPaths[i]] = res.data.signedUrl;
+          });
+          setSignedUrls(urlMap);
+        }
       }
     }
     setLoading(false);
-  }
-
-  /** Genera una signed URL temporal (1 hora) para un path del bucket privado */
-  async function getSignedUrl(path: string): Promise<string | null> {
-    if (signedUrls[path]) return signedUrls[path];
-    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) return null;
-    setSignedUrls(prev => ({ ...prev, [path]: data.signedUrl }));
-    return data.signedUrl;
-  }
-
-  async function openFileUrl(path: string) {
-    const url = await getSignedUrl(path);
-    if (url) window.open(url, "_blank", "noopener");
-    else toast({ title: "No se pudo abrir el archivo", variant: "destructive" });
   }
 
   async function handleUploadDocument() {
@@ -461,10 +462,13 @@ export default function StudentDashboard() {
                               <FileText className="h-3 w-3 text-muted-foreground" />
                               <Badge variant="outline" className="text-xs">v{sub.version}</Badge>
                               {sub.external_url && <a href={sub.external_url} target="_blank" rel="noopener" className="text-primary underline text-xs">URL</a>}
-                              {sub.file_url && (
-                                <button onClick={() => openFileUrl(sub.file_url)} className="text-primary underline text-xs cursor-pointer">
+                              {sub.file_url && signedUrls[sub.file_url] && (
+                                <a href={signedUrls[sub.file_url]} target="_blank" rel="noopener noreferrer" className="text-primary underline text-xs">
                                   Archivo
-                                </button>
+                                </a>
+                              )}
+                              {sub.file_url && !signedUrls[sub.file_url] && (
+                                <span className="text-xs text-muted-foreground italic">Cargando enlace...</span>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -570,9 +574,13 @@ export default function StudentDashboard() {
               {editSubmission?.file_url && !editFile && (
                 <p className="text-xs text-muted-foreground">
                   Archivo actual:{" "}
-                  <button onClick={() => openFileUrl(editSubmission.file_url)} className="text-primary underline cursor-pointer">
-                    Ver archivo
-                  </button>
+                  {editSubmission?.file_url && signedUrls[editSubmission.file_url] ? (
+                    <a href={signedUrls[editSubmission.file_url]} target="_blank" rel="noopener noreferrer" className="text-primary underline cursor-pointer">
+                      Ver archivo
+                    </a>
+                  ) : (
+                    <span className="italic">Cargando enlace...</span>
+                  )}
                 </p>
               )}
             </div>
