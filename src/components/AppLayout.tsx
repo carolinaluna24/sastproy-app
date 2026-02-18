@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import { useNavigate, Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus, Users, KeyRound } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus, Users, KeyRound, DatabaseZap } from "lucide-react";
 
 /**
  * Ítems de navegación organizados por rol.
@@ -21,6 +21,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
     { label: "Editar Usuarios", path: "/users", icon: Users },
     { label: "Reportes", path: "/reports", icon: BarChart3 },
     { label: "Catálogo", path: "/catalog", icon: BookOpen },
+    { label: "Exportar BD", path: "/admin/export", icon: DatabaseZap },
     { label: "Escalabilidad", path: "/about/scalability", icon: Info },
   ],
   DIRECTOR: [
@@ -35,6 +36,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.Elemen
     { label: "Indicadores", path: "/dashboard", icon: LayoutDashboard },
     { label: "Reportes", path: "/reports", icon: BarChart3 },
     { label: "Catálogo", path: "/catalog", icon: BookOpen },
+    { label: "Exportar BD", path: "/admin/export", icon: DatabaseZap },
   ],
 };
 
