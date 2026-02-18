@@ -81,10 +81,12 @@ export default function EvaluateProposal() {
 
     try {
       // Actualizar etapa
+      // Si APROBADA_CON_MODIFICACIONES, se deja en CON_OBSERVACIONES para que el estudiante pueda radicar la versión 2
+      const newSystemState = result === "APROBADA_CON_MODIFICACIONES" ? "CON_OBSERVACIONES" : "CERRADA";
       const { error: updateErr } = await supabase
         .from("project_stages")
         .update({
-          system_state: "CERRADA",
+          system_state: newSystemState,
           official_state: result,
           observations,
         })
