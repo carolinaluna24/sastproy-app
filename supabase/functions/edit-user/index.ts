@@ -28,7 +28,9 @@ Deno.serve(async (req) => {
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser();
     if (!caller) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
@@ -93,10 +95,7 @@ Deno.serve(async (req) => {
     if (id_number !== undefined) profileUpdate.id_number = id_number || null;
 
     if (Object.keys(profileUpdate).length > 0) {
-      const { error: profileError } = await adminClient
-        .from("user_profiles")
-        .update(profileUpdate)
-        .eq("id", user_id);
+      const { error: profileError } = await adminClient.from("user_profiles").update(profileUpdate).eq("id", user_id);
       if (profileError) {
         return new Response(JSON.stringify({ error: profileError.message }), {
           status: 400,
@@ -129,10 +128,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
