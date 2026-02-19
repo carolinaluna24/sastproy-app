@@ -41,13 +41,13 @@ Deno.serve(async (req) => {
     }
 
     // Check coordinator role
-    const { data: roles } = await createClient(supabaseUrl, supabaseServiceKey)
+    const { data: callerRoles } = await createClient(supabaseUrl, supabaseServiceKey)
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
       .eq("role", "COORDINATOR");
 
-    if (!roles || roles.length === 0) {
+    if (!callerRoles || callerRoles.length === 0) {
       return new Response(JSON.stringify({ error: "Solo coordinadores pueden crear usuarios" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -15,7 +15,7 @@ async function callEdgeFunction() {
         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,        
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ ping: true })
+      body: JSON.stringify({ name: "Carolina" })
     })
 
     const text = await response.text()
