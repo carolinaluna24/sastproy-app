@@ -1,0 +1,4 @@
+// env.js
+
+export const SUPABASE_URL = "https://lsvtxagvaktvdgqhrpqw.supabase.co"
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdnR4YWd2YWt0dmRncWhycHF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NDUxMjMsImV4cCI6MjA4NzAyMTEyM30.nLBIyXeKjdAhQPGKeHiZLPCxLHqO_wXWZtWT4Atb86w"
