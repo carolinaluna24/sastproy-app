@@ -90,36 +90,48 @@ export default function ManageUsers() {
   }
 
   function toggleEditRole(role: string) {
-    setEditSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    );
+    setEditSelectedRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   }
 
   async function handleSave() {
     if (!editUser) return;
     if (!editFullName.trim() || !editEmail.trim() || editSelectedRoles.length === 0) {
-      toast({ title: "Error", description: "Nombre, correo y al menos un rol son obligatorios.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Nombre, correo y al menos un rol son obligatorios.",
+        variant: "destructive",
+      });
       return;
     }
 
     setSaving(true);
     try {
-      const response = await supabase.functions.invoke("edit-user", {
-        body: {
-          user_id: editUser.id,
-          full_name: editFullName.trim(),
-          email: editEmail.trim(),
-          phone: editPhone.trim() || null,
-          id_type: editIdType || null,
-          id_number: editIdNumber.trim() || null,
-          roles: editSelectedRoles,
-          program_id: editProgramId || null,
-        },
-      });
+      const payload: Record<string, string> = {
+        user_id: editUser.id,
+        full_name: editFullName.trim(),
+        email: editEmail.trim(),
+        roles: editSelectedRoles.join(","),
+      };
+      if (editPhone.trim()) payload.phone = editPhone.trim();
+      if (editIdType) payload.id_type = editIdType;
+      if (editIdNumber.trim()) payload.id_number = editIdNumber.trim();
+      if (editProgramId && editProgramId !== "none") payload.program_id = editProgramId;
 
-      if (response.error) throw new Error(response.error.message || "Error al actualizar");
-      const result = response.data;
-      if (result.error) throw new Error(result.error);
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/edit-user`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Error al actualizar");
 
       toast({ title: "Usuario actualizado", description: `${editFullName} fue actualizado correctamente.` });
       setEditOpen(false);
@@ -191,14 +203,22 @@ export default function ManageUsers() {
               {filtered.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-sm">{u.full_name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{u.id_type && u.id_number ? `${getIdTypeLabel(u.id_type)} ${u.id_number}` : "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {u.id_type && u.id_number ? `${getIdTypeLabel(u.id_type)} ${u.id_number}` : "—"}
+                  </TableCell>
                   <TableCell className="text-sm">{u.email}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.phone || "—"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {u.roles.length > 0 ? u.roles.map((r) => (
-                        <Badge key={r} variant="outline" className="text-xs">{getRoleLabel(r)}</Badge>
-                      )) : <span className="text-muted-foreground text-xs">Sin rol</span>}
+                      {u.roles.length > 0 ? (
+                        u.roles.map((r) => (
+                          <Badge key={r} variant="outline" className="text-xs">
+                            {getRoleLabel(r)}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Sin rol</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{getProgramName(u.program_id)}</TableCell>
@@ -264,7 +284,9 @@ export default function ManageUsers() {
               <div className="space-y-2">
                 <Label>Tipo de documento</Label>
                 <Select value={editIdType} onValueChange={setEditIdType}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
                     <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
@@ -284,7 +306,9 @@ export default function ManageUsers() {
             </div>
 
             <div className="space-y-2">
-              <Label>Roles * <span className="text-muted-foreground font-normal">(selecciona uno o más)</span></Label>
+              <Label>
+                Roles * <span className="text-muted-foreground font-normal">(selecciona uno o más)</span>
+              </Label>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 {ROLES.map((r) => (
                   <label key={r.value} className="flex items-center gap-2 cursor-pointer text-sm">
@@ -301,18 +325,24 @@ export default function ManageUsers() {
             <div className="space-y-2">
               <Label>Programa académico</Label>
               <Select value={editProgramId} onValueChange={setEditProgramId}>
-                <SelectTrigger><SelectValue placeholder="Sin programa" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin programa" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin programa</SelectItem>
                   {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>
+                Cancelar
+              </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? "Guardando..." : "Guardar Cambios"}
               </Button>
