@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const validRoles = ["STUDENT", "COORDINATOR", "DIRECTOR", "JUROR", "DECANO"];
+    const validRoles = ["STUDENT", "COORDINATOR", "ASESOR", "JUROR", "DECANO"];
     const invalidRole = roleList.find((r: string) => !validRoles.includes(r));
     if (invalidRole) {
       return new Response(JSON.stringify({ error: `Rol inválido: ${invalidRole}` }), {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,13 +78,31 @@ export default function AssignJurors() {
       setJurors(profiles || []);
     }
 
-    // Verificar asignaciones existentes
+    // Verificar asignaciones existentes (sin FK join, cargar perfiles aparte)
     const { data: existing } = await supabase
       .from("assignments")
-      .select("*, user_profiles:user_id(full_name, email)")
+      .select("*")
       .eq("project_id", stageData.project_id)
       .eq("stage_name", "ANTEPROYECTO");
-    setExistingAssignments(existing || []);
+
+    if (existing && existing.length > 0) {
+      const assignedUserIds = existing.map((a) => a.user_id);
+      const { data: assignedProfiles } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .in("id", assignedUserIds);
+      const profileMap: Record<string, any> = {};
+      (assignedProfiles || []).forEach((p) => { profileMap[p.id] = p; });
+      setExistingAssignments(existing.map((a) => ({ ...a, user_profiles: profileMap[a.user_id] || null })));
+
+      // Si ya hay jurados asignados y el estado es AVALADO (re-radicación con aval innecesario),
+      // transicionar automáticamente a EN_REVISION
+      if (stageData.system_state === "AVALADO" || stageData.system_state === "RADICADA") {
+        await supabase.from("project_stages").update({ system_state: "EN_REVISION" as any }).eq("id", stageData.id);
+      }
+    } else {
+      setExistingAssignments([]);
+    }
 
     setLoading(false);
   }
@@ -146,7 +165,7 @@ export default function AssignJurors() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!stage || !project) {
@@ -191,7 +210,7 @@ export default function AssignJurors() {
           <CardContent className="py-8 text-center space-y-3">
             <AlertCircle className="h-10 w-10 text-warning mx-auto" />
             <p className="font-medium">Aval pendiente</p>
-            <p className="text-sm text-muted-foreground">El director debe dar su aval antes de asignar jurados.</p>
+            <p className="text-sm text-muted-foreground">El asesor debe dar su aval antes de asignar jurados.</p>
             <Button variant="outline" onClick={() => navigate("/dashboard")}>
               Volver
             </Button>

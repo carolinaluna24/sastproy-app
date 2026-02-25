@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,9 +53,22 @@ export default function AssignJurorsInformeFinal() {
       setJurors(profiles || []);
     }
 
-    // Asignaciones existentes
-    const { data: existing } = await supabase.from("assignments").select("*, user_profiles:user_id(full_name, email)").eq("project_id", stageData.project_id).eq("stage_name", "INFORME_FINAL");
-    setExistingAssignments(existing || []);
+    // Asignaciones existentes (sin FK join, cargar perfiles aparte)
+    const { data: existing } = await supabase.from("assignments").select("*").eq("project_id", stageData.project_id).eq("stage_name", "INFORME_FINAL");
+    if (existing && existing.length > 0) {
+      const assignedUserIds = existing.map((a) => a.user_id);
+      const { data: assignedProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", assignedUserIds);
+      const profileMap: Record<string, any> = {};
+      (assignedProfiles || []).forEach((p) => { profileMap[p.id] = p; });
+      setExistingAssignments(existing.map((a) => ({ ...a, user_profiles: profileMap[a.user_id] || null })));
+
+      // Si ya hay jurados asignados y el estado es AVALADO/RADICADA (re-radicación), transicionar a EN_REVISION
+      if (stageData.system_state === "AVALADO" || stageData.system_state === "RADICADA") {
+        await supabase.from("project_stages").update({ system_state: "EN_REVISION" as any }).eq("id", stageData.id);
+      }
+    } else {
+      setExistingAssignments([]);
+    }
     setLoading(false);
   }
 
@@ -91,7 +105,7 @@ export default function AssignJurorsInformeFinal() {
     } finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+  if (loading) return <InlineSpinner text="Cargando..." />;
   if (!stage || !project) return <div className="py-8 text-center text-muted-foreground">No encontrado</div>;
 
   if (existingAssignments.length > 0) {
@@ -122,7 +136,7 @@ export default function AssignJurorsInformeFinal() {
           <CardContent className="py-8 text-center space-y-3">
             <AlertCircle className="h-10 w-10 text-warning mx-auto" />
             <p className="font-medium">Aval pendiente</p>
-            <p className="text-sm text-muted-foreground">El director debe dar su aval antes de asignar jurados.</p>
+            <p className="text-sm text-muted-foreground">El asesor debe dar su aval antes de asignar jurados.</p>
             <Button variant="outline" onClick={() => navigate("/dashboard")}>Volver</Button>
           </CardContent>
         </Card>

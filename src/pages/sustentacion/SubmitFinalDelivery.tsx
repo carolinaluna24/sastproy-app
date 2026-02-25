@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,7 +87,7 @@ export default function SubmitFinalDelivery() {
     } finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+  if (loading) return <InlineSpinner text="Cargando..." />;
   if (!stage) return <div className="py-8 text-center text-muted-foreground">Etapa de sustentación no encontrada</div>;
 
   return (

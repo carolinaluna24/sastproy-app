@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -75,24 +76,74 @@ export default function ConsolidateAnteproject() {
         .maybeSingle();
       setProject(proj);
 
-      // Cargar evaluaciones con nombre del jurado
-      const { data: evals } = await supabase
-        .from("evaluations")
-        .select("*, user_profiles:evaluator_id(full_name, email)")
-        .eq("project_stage_id", stageId);
+      // Obtener las últimas 2 submissions
+      const { data: subs } = await supabase
+        .from("submissions")
+        .select("id, version")
+        .eq("project_stage_id", stageId)
+        .order("version", { ascending: false })
+        .limit(2);
 
-      const evalsList = evals || [];
-      setEvaluations(evalsList);
+      const latestSub = subs?.[0] || null;
+      const previousSub = subs?.[1] || null;
+
+      // Cargar evaluaciones de la última submission
+      let evalsList: any[] = [];
+      if (latestSub) {
+        const { data: evals } = await supabase
+          .from("evaluations")
+          .select("*")
+          .eq("project_stage_id", stageId)
+          .eq("submission_id", latestSub.id);
+        evalsList = evals || [];
+      }
+
+      // Si es versión > 1, traer evaluaciones APROBADO de la versión anterior (jurados que ya aprobaron)
+      if (latestSub && latestSub.version > 1 && previousSub) {
+        const { data: prevEvals } = await supabase
+          .from("evaluations")
+          .select("*")
+          .eq("project_stage_id", stageId)
+          .eq("submission_id", previousSub.id);
+
+        // Agregar evaluaciones APROBADO de la versión anterior si el jurado no re-evaluó
+        const currentEvaluatorIds = new Set(evalsList.map(e => e.evaluator_id));
+        for (const pe of (prevEvals || [])) {
+          if (pe.official_result === "APROBADO" && !currentEvaluatorIds.has(pe.evaluator_id)) {
+            evalsList.push({ ...pe, _carriedOver: true });
+          }
+        }
+      }
+
+      // Cargar perfiles de evaluadores por separado (no hay FK directa)
+      const evaluatorIds = [...new Set(evalsList.map(e => e.evaluator_id))];
+      let evaluatorMap: Record<string, any> = {};
+      if (evaluatorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("id, full_name, email")
+          .in("id", evaluatorIds);
+        (profiles || []).forEach(p => { evaluatorMap[p.id] = p; });
+      }
+
+      // Adjuntar perfil a cada evaluación
+      const evalsWithProfiles = evalsList.map(e => ({
+        ...e,
+        user_profiles: evaluatorMap[e.evaluator_id] || null,
+      }));
+      setEvaluations(evalsWithProfiles);
 
       // Calcular resultado consolidado
       if (evalsList.length >= 2) {
         const results = evalsList.map((e) => e.official_result);
-        if (results.includes("NO_APROBADO")) {
-          setConsolidatedResult("NO_APROBADA");
-        } else if (results.includes("APLAZADO_POR_MODIFICACIONES")) {
-          setConsolidatedResult("APROBADA_CON_MODIFICACIONES");
-        } else {
+        const allApproved = results.every((r) => r === "APROBADO");
+        const allRejected = results.every((r) => r === "NO_APROBADO");
+        if (allApproved) {
           setConsolidatedResult("APROBADA");
+        } else if (allRejected) {
+          setConsolidatedResult("NO_APROBADA");
+        } else {
+          setConsolidatedResult("APROBADA_CON_MODIFICACIONES");
         }
       }
     }
@@ -173,7 +224,7 @@ export default function ConsolidateAnteproject() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!stage || !project) {
@@ -213,9 +264,12 @@ export default function ConsolidateAnteproject() {
                         {(ev.user_profiles as any)?.full_name || (ev.user_profiles as any)?.email}
                       </span>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {resultLabels[ev.official_result] || ev.official_result}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      {ev._carriedOver && <Badge variant="secondary" className="text-xs">Versión anterior</Badge>}
+                      <Badge variant="outline" className="text-xs">
+                        {resultLabels[ev.official_result] || ev.official_result}
+                      </Badge>
+                    </div>
                   </div>
                   {ev.observations && (
                     <p className="text-sm text-muted-foreground">📝 {ev.observations}</p>
@@ -273,7 +327,7 @@ export default function ConsolidateAnteproject() {
               )}
             </div>
 
-            {stage.official_state !== "PENDIENTE" ? (
+            {stage.official_state !== "PENDIENTE" && stage.system_state === "CERRADA" ? (
               <div className="text-center">
                 <Badge className="text-sm">Ya consolidado: {stage.official_state}</Badge>
               </div>

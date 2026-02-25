@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +20,8 @@ interface DeadlineRisk {
   days_remaining: number;
   risk_status: string;
 }
+
+const ALL = "__ALL__";
 
 const stageLabels: Record<string, string> = {
   PROPUESTA: "Propuesta",
@@ -34,28 +38,38 @@ const riskBadge: Record<string, string> = {
 
 export default function DeadlinesRisk() {
   const [deadlines, setDeadlines] = useState<DeadlineRisk[]>([]);
+  const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterProgram, setFilterProgram] = useState(ALL);
+  const [filterStage, setFilterStage] = useState(ALL);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await supabase
-        .from("v_deadlines_risk")
-        .select("*")
-        .order("due_date", { ascending: true });
-      setDeadlines((data as DeadlineRisk[]) || []);
+      const [deadlinesRes, progRes] = await Promise.all([
+        supabase.from("v_deadlines_risk").select("*").order("due_date", { ascending: true }),
+        supabase.from("programs").select("id, name"),
+      ]);
+      setDeadlines((deadlinesRes.data as DeadlineRisk[]) || []);
+      setPrograms(progRes.data || []);
       setLoading(false);
     }
     load();
   }, []);
 
   if (loading) {
-    return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando plazos...</div>;
+    return <InlineSpinner text="Cargando plazos..." />;
   }
 
-  const vencidos = deadlines.filter((d) => d.risk_status === "VENCIDO");
-  const porVencer = deadlines.filter((d) => d.risk_status === "POR_VENCER");
-  const activos = deadlines.filter((d) => d.risk_status === "ACTIVO");
+  const filtered = deadlines.filter(d => {
+    if (filterProgram !== ALL && d.program_name !== filterProgram) return false;
+    if (filterStage !== ALL && d.stage_name !== filterStage) return false;
+    return true;
+  });
+
+  const vencidos = filtered.filter((d) => d.risk_status === "VENCIDO");
+  const porVencer = filtered.filter((d) => d.risk_status === "POR_VENCER");
+  const activos = filtered.filter((d) => d.risk_status === "ACTIVO");
 
   function DeadlineTable({ items }: { items: DeadlineRisk[] }) {
     if (items.length === 0) {
@@ -101,10 +115,44 @@ export default function DeadlinesRisk() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bandeja de Plazos</h1>
-        <p className="text-muted-foreground text-sm">Deadlines activos, por vencer y vencidos</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Bandeja de Plazos</h1>
+          <p className="text-muted-foreground text-sm">Deadlines activos, por vencer y vencidos</p>
+        </div>
+        <Link to="/reports"><Button variant="outline" size="sm" className="text-xs">← Indicadores</Button></Link>
       </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Programa</label>
+              <Select value={filterProgram} onValueChange={setFilterProgram}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todos</SelectItem>
+                  {programs.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Etapa</label>
+              <Select value={filterStage} onValueChange={setFilterStage}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas</SelectItem>
+                  <SelectItem value="PROPUESTA">Propuesta</SelectItem>
+                  <SelectItem value="ANTEPROYECTO">Anteproyecto</SelectItem>
+                  <SelectItem value="INFORME_FINAL">Informe Final</SelectItem>
+                  <SelectItem value="SUSTENTACION">Sustentación</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="vencidos">
         <TabsList>

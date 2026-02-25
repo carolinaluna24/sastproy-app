@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,34 +57,60 @@ export default function CoordinatorReports() {
   const [currentStages, setCurrentStages] = useState<any[]>([]);
   const [deadlines, setDeadlines] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
+  const [modalities, setModalities] = useState<any[]>([]);
   const [filterProgram, setFilterProgram] = useState(ALL);
+  const [filterYear, setFilterYear] = useState(ALL);
+  const [filterModality, setFilterModality] = useState(ALL);
+  const [filterStatus, setFilterStatus] = useState(ALL);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     setLoading(true);
-    const [projRes, stagesRes, deadlinesRes, progRes] = await Promise.all([
-      supabase.from("projects").select("id, global_status, program_id, programs(name)"),
+    const [projRes, stagesRes, deadlinesRes, progRes, modRes] = await Promise.all([
+      supabase.from("projects").select("id, global_status, program_id, created_at, modality_id, programs(name), modalities(name)"),
       supabase.from("v_project_current_stage").select("*"),
       supabase.from("v_deadlines_risk").select("*"),
       supabase.from("programs").select("id, name"),
+      supabase.from("modalities").select("id, name"),
     ]);
     setProjects(projRes.data || []);
     setCurrentStages(stagesRes.data || []);
     setDeadlines(deadlinesRes.data || []);
     setPrograms(progRes.data || []);
+    setModalities(modRes.data || []);
     setLoading(false);
   }
 
   if (loading) {
-    return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando reportes...</div>;
+    return <InlineSpinner text="Cargando reportes..." />;
   }
 
-  // Apply program filter
-  const filteredProjects = filterProgram === ALL ? projects : projects.filter(p => p.programs?.name === filterProgram);
-  const filteredStages = filterProgram === ALL ? currentStages : currentStages.filter(s => s.program_name === filterProgram);
-  const filteredDeadlines = filterProgram === ALL ? deadlines : deadlines.filter(d => d.program_name === filterProgram);
+  // Derive available years from projects
+  const availableYears = [...new Set(projects.map(p => new Date(p.created_at).getFullYear()))].sort((a, b) => b - a);
+
+  // Apply filters
+  const filteredProjects = projects.filter(p => {
+    if (filterProgram !== ALL && p.programs?.name !== filterProgram) return false;
+    if (filterYear !== ALL && new Date(p.created_at).getFullYear().toString() !== filterYear) return false;
+    if (filterModality !== ALL && p.modalities?.name !== filterModality) return false;
+    if (filterStatus !== ALL && p.global_status !== filterStatus) return false;
+    return true;
+  });
+  const filteredProjectIds = new Set(filteredProjects.map(p => p.id));
+  const filteredStages = currentStages.filter(s => {
+    if (filterProgram !== ALL && s.program_name !== filterProgram) return false;
+    if (filterModality !== ALL && s.modality_name !== filterModality) return false;
+    if (filterYear !== ALL && s.project_created_at && new Date(s.project_created_at).getFullYear().toString() !== filterYear) return false;
+    if (filterStatus !== ALL && s.global_status !== filterStatus) return false;
+    return true;
+  });
+  const filteredDeadlines = deadlines.filter(d => {
+    if (filterProgram !== ALL && d.program_name !== filterProgram) return false;
+    if (filterStatus !== ALL && d.global_status !== filterStatus) return false;
+    return true;
+  });
 
   const byStatus = countBy(filteredProjects, "global_status");
   const byStage = countBy(filteredStages, "stage_name");
@@ -94,6 +121,15 @@ export default function CoordinatorReports() {
   const stageData = ["PROPUESTA", "ANTEPROYECTO", "INFORME_FINAL", "SUSTENTACION"].map(s => ({ name: stageLabels[s], value: byStage[s] || 0, key: s }));
   const officialData = ["PENDIENTE", "APROBADA", "APROBADA_CON_MODIFICACIONES", "NO_APROBADA"].map(s => ({ name: officialLabels[s], value: byOfficialState[s] || 0, key: s })).filter(d => d.value > 0);
   const riskData = ["VENCIDO", "POR_VENCER", "ACTIVO"].map(s => ({ name: riskLabels[s], value: byRisk[s] || 0, key: s })).filter(d => d.value > 0);
+
+  const activeFilters = [filterProgram, filterYear, filterModality, filterStatus].filter(f => f !== ALL).length;
+
+  function clearFilters() {
+    setFilterProgram(ALL);
+    setFilterYear(ALL);
+    setFilterModality(ALL);
+    setFilterStatus(ALL);
+  }
 
   function handleStatusClick(status: string) {
     navigate(`/reports/projects?status=${status}`);
@@ -110,23 +146,72 @@ export default function CoordinatorReports() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Reportes e Indicadores</h1>
-          <p className="text-muted-foreground text-sm">Vista general del programa de Trabajo de Grado</p>
+          <p className="text-muted-foreground text-sm">
+            Vista general del programa de Trabajo de Grado
+            {activeFilters > 0 && <span className="ml-2 text-xs text-primary">({activeFilters} filtro{activeFilters > 1 ? "s" : ""} activo{activeFilters > 1 ? "s" : ""})</span>}
+          </p>
         </div>
         <div className="flex gap-2 items-end">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Programa</label>
-            <Select value={filterProgram} onValueChange={setFilterProgram}>
-              <SelectTrigger className="text-xs w-[180px]"><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Todos los programas</SelectItem>
-                {programs.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
           <Link to="/reports/deadlines"><Button variant="outline" size="sm" className="gap-2 text-xs"><Clock className="h-3.5 w-3.5" />Plazos</Button></Link>
           <Link to="/reports/projects"><Button variant="outline" size="sm" className="gap-2 text-xs"><List className="h-3.5 w-3.5" />Proyectos</Button></Link>
         </div>
       </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Año</label>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todos los años</SelectItem>
+                  {availableYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Programa</label>
+              <Select value={filterProgram} onValueChange={setFilterProgram}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todos los programas</SelectItem>
+                  {programs.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Modalidad</label>
+              <Select value={filterModality} onValueChange={setFilterModality}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas</SelectItem>
+                  {modalities.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Estado Global</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todos</SelectItem>
+                  <SelectItem value="VIGENTE">Vigente</SelectItem>
+                  <SelectItem value="FINALIZADO">Finalizado</SelectItem>
+                  <SelectItem value="VENCIDO">Vencido</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {activeFilters > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground">
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Row 1: Status Pie + Stage Bar */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

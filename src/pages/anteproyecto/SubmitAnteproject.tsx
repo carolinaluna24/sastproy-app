@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -65,10 +66,11 @@ export default function SubmitAnteproject() {
       });
       if (subErr) throw subErr;
 
-      // Actualizar estado de la etapa a RADICADA
+      // Si es corrección (versión > 1), saltar aval e ir directo a EN_REVISION
+      const newState = version > 1 ? "EN_REVISION" : "RADICADA";
       const { error: stageErr } = await supabase
         .from("project_stages")
-        .update({ system_state: "RADICADA" })
+        .update({ system_state: newState as any })
         .eq("id", stage.id);
       if (stageErr) throw stageErr;
 
@@ -91,7 +93,7 @@ export default function SubmitAnteproject() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!stage) {

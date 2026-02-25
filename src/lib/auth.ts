@@ -11,7 +11,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-export type AppRole = "STUDENT" | "COORDINATOR" | "DIRECTOR" | "JUROR" | "DECANO";
+export type AppRole = "STUDENT" | "COORDINATOR" | "ASESOR" | "JUROR" | "DECANO";
 
 const authErrorMessages: Record<string, string> = {
   "Invalid login credentials": "Credenciales inválidas. Verifica tu correo y contraseña.",

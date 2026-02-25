@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveRole } from "@/contexts/RoleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,8 @@ interface CatalogProject {
 
 export default function CatalogProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { primaryRole, user } = useAuth();
+  const { user } = useAuth();
+  const { activeRole } = useActiveRole();
   const [project, setProject] = useState<CatalogProject | null>(null);
   const [stages, setStages] = useState<any[]>([]);
   const [authors, setAuthors] = useState<string[]>([]);
@@ -86,8 +89,8 @@ export default function CatalogProjectDetail() {
     }
 
     // Verificar si el usuario tiene acceso completo
-    if (user && primaryRole) {
-      if (primaryRole === "COORDINATOR") {
+    if (user && activeRole) {
+      if (activeRole === "COORDINATOR") {
         setHasFullAccess(true);
       } else {
         // Verificar si es miembro del proyecto
@@ -105,7 +108,7 @@ export default function CatalogProjectDetail() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!project) {

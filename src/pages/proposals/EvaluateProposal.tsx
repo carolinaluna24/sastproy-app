@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,7 +86,7 @@ export default function EvaluateProposal() {
       const { data: dirRoles } = await supabase
         .from("user_roles")
         .select("user_id")
-        .eq("role", "DIRECTOR");
+        .eq("role", "ASESOR");
       if (dirRoles && dirRoles.length > 0) {
         const dirIds = dirRoles.map((r) => r.user_id);
         const { data: profiles } = await supabase
@@ -133,7 +134,7 @@ export default function EvaluateProposal() {
         if (directorId) {
           await supabase
             .from("projects")
-            .update({ director_id: directorId })
+            .update({ asesor_id: directorId })
             .eq("id", stage.project_id);
         }
 
@@ -174,7 +175,7 @@ export default function EvaluateProposal() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!stage || !project) {
@@ -250,10 +251,10 @@ export default function EvaluateProposal() {
             {/* Asignar director si se aprueba */}
             {result === "APROBADA" && directors.length > 0 && (
               <div className="space-y-2">
-                <Label>Asignar Director de Proyecto</Label>
+                <Label>Asignar Asesor de Proyecto</Label>
                 <Select value={directorId} onValueChange={setDirectorId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar director" />
+                    <SelectValue placeholder="Seleccionar asesor" />
                   </SelectTrigger>
                   <SelectContent>
                     {directors.map((d) => (
