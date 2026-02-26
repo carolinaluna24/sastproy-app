@@ -427,10 +427,23 @@ export default function StudentDashboard() {
                     {stage.final_grade !== null && <Badge className="text-sm">Nota: {stage.final_grade}/100</Badge>}
                   </div>
 
-                  {stage.observations && (
-                    <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Observaciones:</p>
-                      <p className="text-sm">{stage.observations}</p>
+                  {evals.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Evaluaciones:</p>
+                      {evals.map((ev: any, idx: number) => (
+                        <div key={ev.id} className="rounded-lg border p-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-medium text-xs">Evaluador {idx + 1}</span>
+                            {ev.official_result && (
+                              <Badge variant="outline" className="text-xs">
+                                {ev.official_result === "APROBADO" ? "Aprobado" : ev.official_result === "APLAZADO_POR_MODIFICACIONES" ? "Con modificaciones" : "No aprobado"}
+                              </Badge>
+                            )}
+                          </div>
+                          {ev.observations && <p className="text-xs text-muted-foreground mt-1 ml-5">{ev.observations}</p>}
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -519,25 +532,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {evals.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">Evaluaciones de jurados:</p>
-                      {evals.map((ev: any) => (
-                        <div key={ev.id} className="rounded-lg border p-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Eye className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-medium text-xs">{ev.user_profiles?.full_name || "Jurado"}</span>
-                            {ev.official_result && (
-                              <Badge variant="outline" className="text-xs">
-                                {ev.official_result === "APROBADO" ? "Aprobado" : ev.official_result === "APLAZADO_POR_MODIFICACIONES" ? "Con modificaciones" : "No aprobado"}
-                              </Badge>
-                            )}
-                          </div>
-                          {ev.observations && <p className="text-xs text-muted-foreground mt-1 ml-5">{ev.observations}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   {actions.length > 0 && <div className="flex gap-2 flex-wrap pt-1">{actions}</div>}
                 </CardContent>
