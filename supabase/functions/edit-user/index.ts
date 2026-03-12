@@ -37,13 +37,13 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: roles } = await adminClient
+    const { data: callerRoles } = await adminClient
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
       .eq("role", "COORDINATOR");
 
-    if (!roles || roles.length === 0) {
+    if (!callerRoles || callerRoles.length === 0) {
       return new Response(JSON.stringify({ error: "Solo coordinadores pueden editar usuarios" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
