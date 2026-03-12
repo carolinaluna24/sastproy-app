@@ -105,7 +105,7 @@ export default function AssignJurors() {
       // MODDDD
       toast({
         title: "Mensaje",
-        description: "Proyecto: " + project.id + " - Jurado1: " + juror1 + " - Jurado2:" + juror2,
+        description: "Proyecto: " + project + " - Jurado1: " + juror1 + " - Jurado2:" + juror2,
         variant: "destructive",
       });
       //*******************
