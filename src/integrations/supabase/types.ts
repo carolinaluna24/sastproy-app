@@ -666,6 +666,30 @@ export type Database = {
       }
     }
     Views: {
+      v_catalog_projects: {
+        Row: {
+          author_count: number | null
+          created_at: string | null
+          current_official_state:
+            | Database["public"]["Enums"]["official_state"]
+            | null
+          current_stage: Database["public"]["Enums"]["stage_name"] | null
+          global_status: Database["public"]["Enums"]["global_status"] | null
+          modality_name: string | null
+          program_name: string | null
+          project_id: string | null
+          title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_deadlines_risk: {
         Row: {
           days_remaining: number | null
