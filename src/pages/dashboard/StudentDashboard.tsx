@@ -15,18 +15,18 @@ const statusColors: Record<string, string> = {
 };
 
 const stateLabels: Record<string, string> = {
-  BORRADOR: "Borrador",
-  RADICADA: "Radicada",
-  EN_REVISION: "En Revisión",
-  CON_OBSERVACIONES: "Con Observaciones",
-  CERRADA: "Cerrada",
+  BORRADOR: "Borrador", RADICADA: "Radicada", EN_REVISION: "En Revisión",
+  CON_OBSERVACIONES: "Con Observaciones", CERRADA: "Cerrada",
 };
 
 const officialLabels: Record<string, string> = {
-  PENDIENTE: "Pendiente",
-  APROBADA: "Aprobada",
-  APROBADA_CON_MODIFICACIONES: "Aprobada con Modificaciones",
-  NO_APROBADA: "No Aprobada",
+  PENDIENTE: "Pendiente", APROBADA: "Aprobada",
+  APROBADA_CON_MODIFICACIONES: "Aprobada con Modificaciones", NO_APROBADA: "No Aprobada",
+};
+
+const stageNameLabels: Record<string, string> = {
+  PROPUESTA: "Propuesta", ANTEPROYECTO: "Anteproyecto",
+  INFORME_FINAL: "Informe Final", SUSTENTACION: "Sustentación",
 };
 
 export default function StudentDashboard() {
@@ -35,77 +35,57 @@ export default function StudentDashboard() {
   const [stages, setStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    loadProject();
-  }, [user]);
+  useEffect(() => { if (!user) return; loadProject(); }, [user]);
 
   async function loadProject() {
     setLoading(true);
     const { data: memberships } = await supabase
-      .from("project_members")
-      .select("project_id")
-      .eq("user_id", user!.id)
-      .eq("role", "AUTHOR");
+      .from("project_members").select("project_id").eq("user_id", user!.id).eq("role", "AUTHOR");
 
     if (memberships && memberships.length > 0) {
       const projectId = memberships[0].project_id;
       const { data: proj } = await supabase
-        .from("projects")
-        .select("*, programs(name), modalities(name)")
-        .eq("id", projectId)
-        .maybeSingle();
+        .from("projects").select("*, programs(name), modalities(name)").eq("id", projectId).maybeSingle();
       setProject(proj);
 
       if (proj) {
         const { data: stg } = await supabase
-          .from("project_stages")
-          .select("*")
-          .eq("project_id", proj.id)
-          .order("created_at", { ascending: true });
+          .from("project_stages").select("*").eq("project_id", proj.id).order("created_at", { ascending: true });
         setStages(stg || []);
       }
     }
     setLoading(false);
   }
 
-  if (loading) {
-    return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando proyecto...</div>;
-  }
+  if (loading) return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando proyecto...</div>;
 
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
-        <div className="rounded-full bg-muted p-6">
-          <FolderPlus className="h-10 w-10 text-muted-foreground" />
-        </div>
+        <div className="rounded-full bg-muted p-6"><FolderPlus className="h-10 w-10 text-muted-foreground" /></div>
         <h2 className="text-lg font-semibold">No tienes un proyecto activo</h2>
         <p className="text-muted-foreground text-sm">Crea tu proyecto de trabajo de grado para comenzar.</p>
-        <Link to="/projects/new">
-          <Button>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            Crear Proyecto
-          </Button>
-        </Link>
+        <Link to="/projects/new"><Button><FolderPlus className="mr-2 h-4 w-4" />Crear Proyecto</Button></Link>
       </div>
     );
   }
 
-  /** Determina qué acciones puede hacer el estudiante en cada etapa */
+  /** Acciones del estudiante según etapa y estado */
   function getStageAction(stage: any) {
-    if (stage.stage_name === "PROPUESTA" && stage.system_state === "BORRADOR") {
-      return (
-        <Link to={`/projects/${project.id}/submit-proposal`}>
-          <Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Propuesta</Button>
-        </Link>
-      );
+    const { stage_name, system_state, official_state, final_grade } = stage;
+
+    if (stage_name === "PROPUESTA" && system_state === "BORRADOR") {
+      return <Link to={`/projects/${project.id}/submit-proposal`}><Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Propuesta</Button></Link>;
     }
-    if (stage.stage_name === "ANTEPROYECTO" && stage.system_state === "BORRADOR") {
-      return (
-        <Link to={`/projects/${project.id}/submit-anteproject`}>
-          <Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Anteproyecto</Button>
-        </Link>
-      );
+    if (stage_name === "ANTEPROYECTO" && system_state === "BORRADOR") {
+      return <Link to={`/projects/${project.id}/submit-anteproject`}><Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Anteproyecto</Button></Link>;
+    }
+    if (stage_name === "INFORME_FINAL" && system_state === "BORRADOR") {
+      return <Link to={`/projects/${project.id}/submit-informe-final`}><Button size="sm" variant="outline" className="mt-2 text-xs">Radicar Informe Final</Button></Link>;
+    }
+    // Post-sustentación: si sustentación cerrada con nota >=70 y proyecto aún vigente
+    if (stage_name === "SUSTENTACION" && system_state === "CERRADA" && final_grade !== null && final_grade >= 70 && project.global_status === "VIGENTE") {
+      return <Link to={`/projects/${project.id}/submit-final-delivery`}><Button size="sm" variant="outline" className="mt-2 text-xs">Entregar Documento Final</Button></Link>;
     }
     return null;
   }
@@ -120,13 +100,8 @@ export default function StudentDashboard() {
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-lg">{project.title}</CardTitle>
-              <CardDescription>{project.description}</CardDescription>
-            </div>
-            <Badge className={statusColors[project.global_status] || "bg-muted"}>
-              {project.global_status}
-            </Badge>
+            <div><CardTitle className="text-lg">{project.title}</CardTitle><CardDescription>{project.description}</CardDescription></div>
+            <Badge className={statusColors[project.global_status] || "bg-muted"}>{project.global_status}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
@@ -143,23 +118,16 @@ export default function StudentDashboard() {
               <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-accent p-2">
-                    {stage.stage_name === "PROPUESTA" ? (
-                      <FileText className="h-4 w-4 text-accent-foreground" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-accent-foreground" />
-                    )}
+                    {stage.stage_name === "PROPUESTA" ? <FileText className="h-4 w-4 text-accent-foreground" /> : <Clock className="h-4 w-4 text-accent-foreground" />}
                   </div>
                   <div>
-                    <p className="font-medium text-sm">{stage.stage_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Estado: {stateLabels[stage.system_state] || stage.system_state}
-                    </p>
+                    <p className="font-medium text-sm">{stageNameLabels[stage.stage_name] || stage.stage_name}</p>
+                    <p className="text-xs text-muted-foreground">Estado: {stateLabels[stage.system_state] || stage.system_state}</p>
+                    {stage.final_grade !== null && <p className="text-xs font-medium">Nota: {stage.final_grade}/100</p>}
                   </div>
                 </div>
                 <div className="text-right">
-                  <Badge variant="outline" className="text-xs">
-                    {officialLabels[stage.official_state] || stage.official_state}
-                  </Badge>
+                  <Badge variant="outline" className="text-xs">{officialLabels[stage.official_state] || stage.official_state}</Badge>
                   {getStageAction(stage)}
                 </div>
               </CardContent>

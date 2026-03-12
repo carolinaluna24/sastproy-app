@@ -92,7 +92,7 @@ export default function JurorDashboard() {
                 )}
               </div>
               {a.stage && (
-                <Link to={`/anteproyecto/${a.stage.id}/evaluate`}>
+                <Link to={`/${a.stage_name === "INFORME_FINAL" ? "informe-final" : "anteproyecto"}/${a.stage.id}/evaluate`}>
                   <Button size="sm">Evaluar</Button>
                 </Link>
               )}

@@ -125,6 +125,44 @@ export type Database = {
           },
         ]
       }
+      defense_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          location: string
+          notes: string | null
+          scheduled_at: string
+          stage_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          location: string
+          notes?: string | null
+          scheduled_at: string
+          stage_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          location?: string
+          notes?: string | null
+          scheduled_at?: string
+          stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "defense_sessions_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       endorsements: {
         Row: {
           approved: boolean
