@@ -57,27 +57,35 @@ export default function CreateUser() {
 
     setSaving(true);
     try {
-      const response = await supabase.functions.invoke("create-user", {
-        body: {
-          email: email.trim(),
-          password,
-          full_name: `${firstName.trim()} ${lastName.trim()}`,
-          phone: phone.trim() || null,
-          id_type: idType || null,
-          id_number: idNumber.trim() || null,
-          roles: selectedRoles,
-          program_id: programId || null,
-        },
-      });
+      const payload: Record<string, string> = {
+        email: email.trim(),
+        password,
+        full_name: `${firstName.trim()} ${lastName.trim()}`,
+        roles: selectedRoles.join(","),
+      };
+      if (phone.trim()) payload.phone = phone.trim();
+      if (idType) payload.id_type = idType;
+      if (idNumber.trim()) payload.id_number = idNumber.trim();
+      if (programId) payload.program_id = programId;
 
-      if (response.error) {
-        throw new Error(response.error.message || "Error al crear usuario");
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/create-user`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        throw new Error(result.error || "Error al crear usuario");
       }
 
-      const result = response.data;
-      if (result.error) {
-        throw new Error(result.error);
-      }
 
       const roleLabels = selectedRoles.map((r) => ROLES.find((rl) => rl.value === r)?.label).join(", ");
       toast({ title: "Usuario creado", description: `${firstName} ${lastName} fue registrado con roles: ${roleLabels}.` });

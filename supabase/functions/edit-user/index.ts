@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller is coordinator
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -52,7 +51,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, full_name, email, phone, role, roles, program_id, id_type, id_number } = await req.json();
+    // Read params from POST body
+    const body = await req.json();
+    const user_id = body.user_id || "";
+    const full_name = body.full_name || "";
+    const email = body.email || "";
+    const phone = body.phone ?? null;
+    const rolesParam = body.roles || "";
+    const role = body.role || "";
+    const program_id = body.program_id ?? null;
+    const id_type = body.id_type ?? null;
+    const id_number = body.id_number ?? null;
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id es requerido" }), {
@@ -89,10 +98,10 @@ Deno.serve(async (req) => {
     const profileUpdate: Record<string, unknown> = {};
     if (full_name) profileUpdate.full_name = full_name;
     if (email) profileUpdate.email = email;
-    if (phone !== undefined) profileUpdate.phone = phone || null;
-    if (program_id !== undefined) profileUpdate.program_id = program_id || null;
-    if (id_type !== undefined) profileUpdate.id_type = id_type || null;
-    if (id_number !== undefined) profileUpdate.id_number = id_number || null;
+    if (phone !== null) profileUpdate.phone = phone || null;
+    if (program_id !== null) profileUpdate.program_id = program_id || null;
+    if (id_type !== null) profileUpdate.id_type = id_type || null;
+    if (id_number !== null) profileUpdate.id_number = id_number || null;
 
     if (Object.keys(profileUpdate).length > 0) {
       const { error: profileError } = await adminClient.from("user_profiles").update(profileUpdate).eq("id", user_id);
@@ -104,8 +113,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update roles if provided (support both single and multiple)
-    const roleList: string[] = roles && Array.isArray(roles) ? roles : role ? [role] : [];
+    // Update roles if provided
+    const roleList: string[] = rolesParam ? rolesParam.split(",") : role ? [role] : [];
     if (roleList.length > 0) {
       const validRoles = ["STUDENT", "COORDINATOR", "DIRECTOR", "JUROR", "DECANO"];
       const invalidRole = roleList.find((r: string) => !validRoles.includes(r));
@@ -116,7 +125,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Delete existing roles and insert new ones
       await adminClient.from("user_roles").delete().eq("user_id", user_id);
       const roleInserts = roleList.map((r: string) => ({ user_id, role: r }));
       const { error: roleError } = await adminClient.from("user_roles").insert(roleInserts);

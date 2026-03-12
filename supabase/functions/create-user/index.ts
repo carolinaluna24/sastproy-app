@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify the caller is a coordinator
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
@@ -25,7 +24,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Client with caller's token to check role
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -40,7 +38,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check coordinator role
     const { data: callerRoles } = await createClient(supabaseUrl, supabaseServiceKey)
       .from("user_roles")
       .select("role")
@@ -54,10 +51,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, full_name, phone, role, roles, program_id, id_type, id_number } = await req.json();
+    // Read params from POST body
+    const body = await req.json();
+    const email = body.email || "";
+    const password = body.password || "";
+    const full_name = body.full_name || "";
+    const phone = body.phone || "";
+    const rolesParam = body.roles || "";
+    const role = body.role || "";
+    const program_id = body.program_id || "";
+    const id_type = body.id_type || "";
+    const id_number = body.id_number || "";
 
-    // Support both single role (legacy) and multiple roles
-    const roleList: string[] = roles && Array.isArray(roles) ? roles : role ? [role] : [];
+    // Support both comma-separated roles and single role
+    const roleList: string[] = Array.isArray(rolesParam) ? rolesParam : rolesParam ? rolesParam.split(",") : role ? [role] : [];
 
     if (!email || !password || !full_name || roleList.length === 0) {
       return new Response(JSON.stringify({ error: "Campos requeridos: email, password, full_name, al menos un rol" }), {
@@ -77,7 +84,6 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create auth user
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -94,7 +100,6 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile with additional fields
     const profileUpdate: Record<string, unknown> = {};
     if (phone) profileUpdate.phone = phone;
     if (program_id) profileUpdate.program_id = program_id;
@@ -105,7 +110,6 @@ Deno.serve(async (req) => {
       await adminClient.from("user_profiles").update(profileUpdate).eq("id", userId);
     }
 
-    // Assign roles
     const roleInserts = roleList.map((r: string) => ({ user_id: userId, role: r }));
     const { error: roleError } = await adminClient.from("user_roles").insert(roleInserts);
 
