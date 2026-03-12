@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { UserPlus } from "lucide-react";
 
@@ -24,7 +25,7 @@ export default function CreateUser() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [programId, setProgramId] = useState("");
   const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -35,11 +36,17 @@ export default function CreateUser() {
     });
   }, []);
 
+  function toggleRole(role: string) {
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim() || !role || !idType || !idNumber.trim()) {
-      toast({ title: "Error", description: "Todos los campos marcados son obligatorios.", variant: "destructive" });
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim() || selectedRoles.length === 0 || !idType || !idNumber.trim()) {
+      toast({ title: "Error", description: "Todos los campos marcados son obligatorios. Selecciona al menos un rol.", variant: "destructive" });
       return;
     }
 
@@ -50,9 +57,6 @@ export default function CreateUser() {
 
     setSaving(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
       const response = await supabase.functions.invoke("create-user", {
         body: {
           email: email.trim(),
@@ -61,7 +65,7 @@ export default function CreateUser() {
           phone: phone.trim() || null,
           id_type: idType || null,
           id_number: idNumber.trim() || null,
-          role,
+          roles: selectedRoles,
           program_id: programId || null,
         },
       });
@@ -75,7 +79,8 @@ export default function CreateUser() {
         throw new Error(result.error);
       }
 
-      toast({ title: "Usuario creado", description: `${firstName} ${lastName} fue registrado como ${ROLES.find(r => r.value === role)?.label}.` });
+      const roleLabels = selectedRoles.map((r) => ROLES.find((rl) => rl.value === r)?.label).join(", ");
+      toast({ title: "Usuario creado", description: `${firstName} ${lastName} fue registrado con roles: ${roleLabels}.` });
       setFirstName("");
       setLastName("");
       setIdType("");
@@ -83,7 +88,7 @@ export default function CreateUser() {
       setPhone("");
       setEmail("");
       setPassword("");
-      setRole("");
+      setSelectedRoles([]);
       setProgramId("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -92,13 +97,15 @@ export default function CreateUser() {
     }
   }
 
+  const showProgram = selectedRoles.includes("STUDENT") || selectedRoles.includes("DIRECTOR");
+
   return (
     <div className="max-w-xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <UserPlus className="h-6 w-6" /> Crear Usuario
         </h1>
-        <p className="text-muted-foreground text-sm">Registra un nuevo usuario y asígnale un rol en el sistema.</p>
+        <p className="text-muted-foreground text-sm">Registra un nuevo usuario y asígnale uno o más roles en el sistema.</p>
       </div>
 
       <Card>
@@ -152,18 +159,21 @@ export default function CreateUser() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rol *</Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Roles * <span className="text-muted-foreground font-normal">(selecciona uno o más)</span></Label>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {ROLES.map((r) => (
+                  <label key={r.value} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={selectedRoles.includes(r.value)}
+                      onCheckedChange={() => toggleRole(r.value)}
+                    />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
             </div>
 
-            {(role === "STUDENT" || role === "DIRECTOR") && (
+            {showProgram && (
               <div className="space-y-2">
                 <Label>Programa académico</Label>
                 <Select value={programId} onValueChange={setProgramId}>

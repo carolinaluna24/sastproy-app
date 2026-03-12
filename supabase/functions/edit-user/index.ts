@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, full_name, email, phone, role, program_id, id_type, id_number } = await req.json();
+    const { user_id, full_name, email, phone, role, roles, program_id, id_type, id_number } = await req.json();
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id es requerido" }), {
@@ -105,22 +105,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update role if provided
-    if (role) {
+    // Update roles if provided (support both single and multiple)
+    const roleList: string[] = roles && Array.isArray(roles) ? roles : role ? [role] : [];
+    if (roleList.length > 0) {
       const validRoles = ["STUDENT", "COORDINATOR", "DIRECTOR", "JUROR", "DECANO"];
-      if (!validRoles.includes(role)) {
-        return new Response(JSON.stringify({ error: "Rol inválido" }), {
+      const invalidRole = roleList.find((r: string) => !validRoles.includes(r));
+      if (invalidRole) {
+        return new Response(JSON.stringify({ error: `Rol inválido: ${invalidRole}` }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Delete existing roles and insert new one
+      // Delete existing roles and insert new ones
       await adminClient.from("user_roles").delete().eq("user_id", user_id);
-      const { error: roleError } = await adminClient.from("user_roles").insert({
-        user_id,
-        role,
-      });
+      const roleInserts = roleList.map((r: string) => ({ user_id, role: r }));
+      const { error: roleError } = await adminClient.from("user_roles").insert(roleInserts);
       if (roleError) {
         return new Response(JSON.stringify({ error: roleError.message }), {
           status: 400,
