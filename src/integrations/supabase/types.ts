@@ -123,6 +123,20 @@ export type Database = {
             referencedRelation: "project_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deadlines_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deadlines_risk"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "deadlines_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_project_current_stage"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       defense_sessions: {
@@ -160,6 +174,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "defense_sessions_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deadlines_risk"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "defense_sessions_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_project_current_stage"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -275,6 +303,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluations_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deadlines_risk"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "evaluations_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_project_current_stage"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "evaluations_submission_id_fkey"
@@ -553,6 +595,20 @@ export type Database = {
             referencedRelation: "project_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "submissions_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deadlines_risk"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "submissions_project_stage_id_fkey"
+            columns: ["project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_project_current_stage"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       user_profiles: {
@@ -610,7 +666,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_deadlines_risk: {
+        Row: {
+          days_remaining: number | null
+          deadline_created_at: string | null
+          deadline_description: string | null
+          deadline_id: string | null
+          due_date: string | null
+          global_status: Database["public"]["Enums"]["global_status"] | null
+          official_state: Database["public"]["Enums"]["official_state"] | null
+          program_name: string | null
+          project_id: string | null
+          project_title: string | null
+          risk_status: string | null
+          stage_id: string | null
+          stage_name: Database["public"]["Enums"]["stage_name"] | null
+          system_state: Database["public"]["Enums"]["system_state"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_project_current_stage: {
+        Row: {
+          director_id: string | null
+          final_grade: number | null
+          global_status: Database["public"]["Enums"]["global_status"] | null
+          modality_id: string | null
+          modality_name: string | null
+          observations: string | null
+          official_state: Database["public"]["Enums"]["official_state"] | null
+          program_id: string | null
+          program_name: string | null
+          project_created_at: string | null
+          project_id: string | null
+          project_title: string | null
+          stage_created_at: string | null
+          stage_id: string | null
+          stage_name: Database["public"]["Enums"]["stage_name"] | null
+          stage_updated_at: string | null
+          system_state: Database["public"]["Enums"]["system_state"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: false
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_project_access: {

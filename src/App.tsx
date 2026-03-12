@@ -24,6 +24,9 @@ import ConsolidateInformeFinal from "./pages/informe-final/ConsolidateInformeFin
 import ScheduleDefense from "./pages/sustentacion/ScheduleDefense";
 import RecordDefenseResult from "./pages/sustentacion/RecordDefenseResult";
 import SubmitFinalDelivery from "./pages/sustentacion/SubmitFinalDelivery";
+import CoordinatorReports from "./pages/reports/CoordinatorReports";
+import DeadlinesRisk from "./pages/reports/DeadlinesRisk";
+import ProjectsReport from "./pages/reports/ProjectsReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +63,10 @@ const App = () => (
             {/* Sustentación */}
             <Route path="/sustentacion/:stageId/schedule" element={<ScheduleDefense />} />
             <Route path="/sustentacion/:stageId/record-result" element={<RecordDefenseResult />} />
+            {/* Reportes (Coordinador) */}
+            <Route path="/reports" element={<CoordinatorReports />} />
+            <Route path="/reports/deadlines" element={<DeadlinesRisk />} />
+            <Route path="/reports/projects" element={<ProjectsReport />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
