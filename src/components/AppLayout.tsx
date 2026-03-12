@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import { useNavigate, Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus, Users } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, FolderPlus, FileCheck, Clock, BarChart3, BookOpen, Info, UserPlus, Users, KeyRound } from "lucide-react";
 
 /**
  * Ítems de navegación organizados por rol.
@@ -108,6 +108,11 @@ export default function AppLayout() {
               <p className="font-medium">{user.email}</p>
               <p className="text-muted-foreground">{roleLabel[primaryRole || ""] || "Sin rol"}</p>
             </div>
+            <Link to="/settings/password">
+              <Button variant="ghost" size="icon" title="Cambiar contraseña">
+                <KeyRound className="h-4 w-4" />
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión">
               <LogOut className="h-4 w-4" />
             </Button>
