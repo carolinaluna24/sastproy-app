@@ -67,16 +67,23 @@ export default function CatalogProjectDetail() {
 
     setStages(stagesData || []);
 
-    // Cargar nombres de autores
+    // Cargar nombres de autores (sin FK directa, se hace en dos pasos)
     const { data: membersData } = await supabase
       .from("project_members")
-      .select("user_id, user_profiles(full_name)")
+      .select("user_id")
       .eq("project_id", projectId!)
       .eq("role", "AUTHOR");
 
-    setAuthors(
-      (membersData || []).map((m: any) => m.user_profiles?.full_name).filter(Boolean)
-    );
+    if (membersData && membersData.length > 0) {
+      const userIds = membersData.map((m) => m.user_id);
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .in("id", userIds);
+      setAuthors((profiles || []).map((p) => p.full_name));
+    } else {
+      setAuthors([]);
+    }
 
     // Verificar si el usuario tiene acceso completo
     if (user && primaryRole) {
