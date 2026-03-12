@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, full_name, email, phone, role, program_id } = await req.json();
+    const { user_id, full_name, email, phone, role, program_id, id_type, id_number } = await req.json();
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id es requerido" }), {
@@ -89,6 +89,8 @@ Deno.serve(async (req) => {
     if (email) profileUpdate.email = email;
     if (phone !== undefined) profileUpdate.phone = phone || null;
     if (program_id !== undefined) profileUpdate.program_id = program_id || null;
+    if (id_type !== undefined) profileUpdate.id_type = id_type || null;
+    if (id_number !== undefined) profileUpdate.id_number = id_number || null;
 
     if (Object.keys(profileUpdate).length > 0) {
       const { error: profileError } = await adminClient

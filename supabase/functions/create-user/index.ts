@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, full_name, phone, role, program_id } = await req.json();
+    const { email, password, full_name, phone, role, program_id, id_type, id_number } = await req.json();
 
     if (!email || !password || !full_name || !role) {
       return new Response(JSON.stringify({ error: "Campos requeridos: email, password, full_name, role" }), {
@@ -90,14 +90,15 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile with phone
-    if (phone) {
-      await adminClient.from("user_profiles").update({ phone }).eq("id", userId);
-    }
+    // Update profile with additional fields
+    const profileUpdate: Record<string, unknown> = {};
+    if (phone) profileUpdate.phone = phone;
+    if (program_id) profileUpdate.program_id = program_id;
+    if (id_type) profileUpdate.id_type = id_type;
+    if (id_number) profileUpdate.id_number = id_number;
 
-    // Update program_id if provided
-    if (program_id) {
-      await adminClient.from("user_profiles").update({ program_id }).eq("id", userId);
+    if (Object.keys(profileUpdate).length > 0) {
+      await adminClient.from("user_profiles").update(profileUpdate).eq("id", userId);
     }
 
     // Assign role
