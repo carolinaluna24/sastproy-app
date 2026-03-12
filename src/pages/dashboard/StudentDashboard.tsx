@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, Eye, Send, Upload } from "lucide-react";
+import { FolderPlus, FileText, Clock, CheckCircle, AlertCircle, Eye, Send, Upload, Pencil } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   VIGENTE: "bg-success text-success-foreground",
@@ -56,6 +56,14 @@ export default function StudentDashboard() {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+
+  // Edit dialog state
+  const [editSubmission, setEditSubmission] = useState<any>(null);
+  const [editUrl, setEditUrl] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => { if (user) loadProject(); }, [user]);
 
@@ -160,6 +168,54 @@ export default function StudentDashboard() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleEditSubmission() {
+    if (!user || !editSubmission || !project) return;
+    setEditing(true);
+    try {
+      let fileUrl = editSubmission.file_url;
+
+      if (editFile) {
+        const ext = editFile.name.split(".").pop();
+        const path = `${user.id}/${project.id}/${editSubmission.project_stage_id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("documents").upload(path, editFile);
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+      }
+
+      const { error } = await supabase.from("submissions").update({
+        external_url: editUrl || null,
+        file_url: fileUrl,
+        notes: editNotes || null,
+      }).eq("id", editSubmission.id);
+      if (error) throw error;
+
+      await supabase.from("audit_events").insert({
+        project_id: project.id, user_id: user.id,
+        event_type: "SUBMISSION_EDITED",
+        description: `Documento editado (v${editSubmission.version})`,
+        metadata: { submission_id: editSubmission.id, version: editSubmission.version },
+      });
+
+      toast({ title: "Documento actualizado exitosamente" });
+      setEditOpen(false);
+      setEditSubmission(null);
+      loadProject();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  function openEditDialog(sub: any) {
+    setEditSubmission(sub);
+    setEditUrl(sub.external_url || "");
+    setEditNotes(sub.notes || "");
+    setEditFile(null);
+    setEditOpen(true);
   }
 
   async function handleRequestEndorsement(stage: any) {
@@ -311,17 +367,27 @@ export default function StudentDashboard() {
                   {submissions.length > 0 && (
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Documentos radicados:</p>
-                      {submissions.map((sub: any) => (
-                        <div key={sub.id} className="rounded-lg border p-2 text-sm flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-3 w-3 text-muted-foreground" />
-                            <Badge variant="outline" className="text-xs">v{sub.version}</Badge>
-                            {sub.external_url && <a href={sub.external_url} target="_blank" rel="noopener" className="text-primary underline text-xs">URL</a>}
-                            {sub.file_url && <a href={sub.file_url} target="_blank" rel="noopener" className="text-primary underline text-xs">Archivo</a>}
+                      {submissions.map((sub: any) => {
+                        const canEdit = ["BORRADOR", "RADICADA", "CON_OBSERVACIONES"].includes(stage.system_state);
+                        return (
+                          <div key={sub.id} className="rounded-lg border p-2 text-sm flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-3 w-3 text-muted-foreground" />
+                              <Badge variant="outline" className="text-xs">v{sub.version}</Badge>
+                              {sub.external_url && <a href={sub.external_url} target="_blank" rel="noopener" className="text-primary underline text-xs">URL</a>}
+                              {sub.file_url && <a href={sub.file_url} target="_blank" rel="noopener" className="text-primary underline text-xs">Archivo</a>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {canEdit && (
+                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => openEditDialog(sub)} title="Editar documento">
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <span className="text-xs text-muted-foreground">{new Date(sub.created_at).toLocaleDateString("es-CO")}</span>
+                            </div>
                           </div>
-                          <span className="text-xs text-muted-foreground">{new Date(sub.created_at).toLocaleDateString("es-CO")}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -392,6 +458,38 @@ export default function StudentDashboard() {
                 {uploading ? "Subiendo..." : "Radicar Documento"}
               </Button>
               <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Documento — v{editSubmission?.version}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Enlace URL (Google Drive, etc.)</Label>
+              <Input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)} placeholder="https://drive.google.com/..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Reemplazar archivo PDF</Label>
+              <Input type="file" accept=".pdf,.doc,.docx" onChange={e => setEditFile(e.target.files?.[0] || null)} />
+              {editSubmission?.file_url && !editFile && (
+                <p className="text-xs text-muted-foreground">Archivo actual: <a href={editSubmission.file_url} target="_blank" rel="noopener" className="text-primary underline">Ver archivo</a></p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Notas adicionales</Label>
+              <Textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Notas opcionales" rows={3} />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={handleEditSubmission} disabled={editing || (!editUrl && !editFile && !editSubmission?.file_url)}>
+                {editing ? "Guardando..." : "Guardar Cambios"}
+              </Button>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
             </div>
           </div>
         </DialogContent>
