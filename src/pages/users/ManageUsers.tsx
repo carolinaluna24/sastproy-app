@@ -136,7 +136,7 @@ export default function ManageUsers() {
     return (
       u.full_name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
-      u.roles.some((r) => r.toLowerCase().includes(q))
+      u.roles.some((r) => getRoleLabel(r).toLowerCase().includes(q))
     );
   });
 
