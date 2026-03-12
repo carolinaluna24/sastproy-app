@@ -79,7 +79,7 @@ export default function StudentDashboard() {
     const { data: memberships } = await supabase
       .from("project_members").select("project_id, projects!inner(global_status)")
       .eq("user_id", user!.id).eq("role", "AUTHOR")
-      .eq("projects.global_status", "VIGENTE");
+      .in("projects.global_status", ["VIGENTE", "FINALIZADO"]);
 
     if (memberships && memberships.length > 0) {
       const projectId = memberships[0].project_id;
