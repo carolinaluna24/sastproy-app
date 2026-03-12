@@ -107,14 +107,11 @@ export default function CreateProject() {
         return;
       }
 
-      // Verificar que tenga rol STUDENT
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", data.id)
-        .eq("role", "STUDENT");
+      // Verificar que tenga rol STUDENT usando función security definer
+      const { data: isStudent } = await supabase
+        .rpc("has_role", { _user_id: data.id, _role: "STUDENT" });
 
-      if (!roles || roles.length === 0) {
+      if (!isStudent) {
         setSecondAuthorStatus("not_found");
         setSecondAuthorName("El usuario no tiene rol de Estudiante");
         return;
