@@ -22,36 +22,44 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Timeout de seguridad: si loading no se resuelve en 5s, forzar fin
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (event === "TOKEN_REFRESHED" && !session) {
-          // El refresh falló: sesión expirada
           setUser(null);
           setRoles([]);
           setLoading(false);
+          clearTimeout(safetyTimeout);
           return;
         }
         setUser(session?.user ?? null);
         if (session?.user) {
-          const r = await getCurrentUserRoles();
-          setRoles(r);
+          // Diferir la llamada async para no bloquear el callback
+          getCurrentUserRoles().then((r) => {
+            setRoles(r);
+            setLoading(false);
+            clearTimeout(safetyTimeout);
+          }).catch(() => {
+            setRoles([]);
+            setLoading(false);
+            clearTimeout(safetyTimeout);
+          });
         } else {
           setRoles([]);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
         }
-        setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const r = await getCurrentUserRoles();
-        setRoles(r);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const primaryRole = roles[0] ?? null;
