@@ -31,13 +31,13 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId]);
+  }, [projectId, primaryRole]);
 
   async function loadData() {
     const [projRes, stagesRes, membersRes, auditRes] = await Promise.all([
       supabase.from("projects").select("*, programs(name), modalities(name), user_profiles!projects_director_id_fkey(full_name)").eq("id", projectId!).maybeSingle(),
       supabase.from("project_stages").select("*").eq("project_id", projectId!).order("created_at"),
-      supabase.from("project_members").select("*, user_profiles(full_name, email)").eq("project_id", projectId!),
+      supabase.from("project_members").select("*").eq("project_id", projectId!),
       (primaryRole === "COORDINATOR" || primaryRole === "DECANO")
         ? supabase.from("audit_events").select("*").eq("project_id", projectId!).order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
@@ -45,11 +45,21 @@ export default function ProjectDetail() {
 
     setProject(projRes.data);
     setStages(stagesRes.data || []);
-    setMembers(membersRes.data || []);
     setAuditEvents(auditRes.data || []);
 
-    // Cargar directores disponibles si es coordinador y no tiene director
-    if (primaryRole === "COORDINATOR" && projRes.data) {
+    // Fetch member profiles separately (no FK between project_members and user_profiles)
+    const rawMembers = membersRes.data || [];
+    if (rawMembers.length > 0) {
+      const userIds = rawMembers.map((m: any) => m.user_id);
+      const { data: profiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", userIds);
+      const profileMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc; }, {});
+      setMembers(rawMembers.map((m: any) => ({ ...m, user_profiles: profileMap[m.user_id] || null })));
+    } else {
+      setMembers([]);
+    }
+
+    // Cargar directores disponibles si es coordinador
+    if (primaryRole === "COORDINATOR") {
       const { data: dirRoles } = await supabase.from("user_roles").select("user_id").eq("role", "DIRECTOR");
       if (dirRoles && dirRoles.length > 0) {
         const { data: dirProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", dirRoles.map(r => r.user_id));
