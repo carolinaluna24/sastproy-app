@@ -40,19 +40,6 @@ export default function Login() {
     }
   };
 
-  // 🔥 AUTOLOGIN SOLO EN DESARROLLO
-  useEffect(() => {
-    const isDev = import.meta.env.DEV;
-    const autoLogin = import.meta.env.VITE_AUTOLOGIN === "true";
-
-    if (isDev && autoLogin) {
-      loginUser(
-        import.meta.env.VITE_DEV_EMAIL,
-        import.meta.env.VITE_DEV_PASSWORD
-      );
-    }
-  }, []);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     await loginUser(email, password);
