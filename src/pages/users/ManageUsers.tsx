@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import { Users, Pencil, Search } from "lucide-react";
 const ROLES = [
   { value: "STUDENT", label: "Estudiante" },
   { value: "COORDINATOR", label: "Coordinador" },
-  { value: "DIRECTOR", label: "Director" },
+  { value: "ASESOR", label: "Asesor" },
   { value: "JUROR", label: "Jurado" },
   { value: "DECANO", label: "Directivo" },
 ];
@@ -161,7 +162,7 @@ export default function ManageUsers() {
     return "—";
   };
 
-  if (loading) return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando...</div>;
+  if (loading) return <InlineSpinner text="Cargando..." />;
 
   return (
     <div className="space-y-6">

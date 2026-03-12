@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,7 @@ export default function ProjectsReport() {
   const [filterStatus, setFilterStatus] = useState(searchParams.get("status") || ALL);
   const [filterStage, setFilterStage] = useState(searchParams.get("stage") || ALL);
   const [filterOfficial, setFilterOfficial] = useState(searchParams.get("official") || ALL);
+  const [filterYear, setFilterYear] = useState(ALL);
 
   useEffect(() => {
     async function load() {
@@ -48,11 +50,14 @@ export default function ProjectsReport() {
     load();
   }, []);
 
+  const availableYears = [...new Set(rows.map(r => new Date(r.project_created_at).getFullYear()))].sort((a, b) => b - a);
+
   const filtered = rows.filter((r) => {
     if (filterProgram !== ALL && r.program_name !== filterProgram) return false;
     if (filterStatus !== ALL && r.global_status !== filterStatus) return false;
     if (filterStage !== ALL && r.stage_name !== filterStage) return false;
     if (filterOfficial !== ALL && r.official_state !== filterOfficial) return false;
+    if (filterYear !== ALL && new Date(r.project_created_at).getFullYear().toString() !== filterYear) return false;
     return true;
   });
 
@@ -74,7 +79,7 @@ export default function ProjectsReport() {
   }
 
   if (loading) {
-    return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando reporte...</div>;
+    return <InlineSpinner text="Cargando reporte..." />;
   }
 
   const statusColors: Record<string, string> = {
@@ -99,7 +104,17 @@ export default function ProjectsReport() {
 
       <Card>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Año</label>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todos</SelectItem>
+                  {availableYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Programa</label>
               <Select value={filterProgram} onValueChange={setFilterProgram}>

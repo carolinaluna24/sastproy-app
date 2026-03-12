@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
 
-/** Página para que el director dé aval al anteproyecto */
+/** Página para que el asesor dé aval al anteproyecto */
 export default function EndorseAnteproject() {
   const { stageId } = useParams<{ stageId: string }>();
   const { user } = useAuth();
@@ -82,12 +83,19 @@ export default function EndorseAnteproject() {
       });
       if (error) throw error;
 
+      // Si se aprueba el aval, cambiar system_state a AVALADO
+      if (approved) {
+        await supabase.from("project_stages").update({
+          system_state: "AVALADO" as any,
+        }).eq("id", stage.id);
+      }
+
       // Evento de auditoría
       await supabase.from("audit_events").insert({
         project_id: stage.project_id,
         user_id: user.id,
         event_type: "ANTEPROYECTO_ENDORSED",
-        description: `Director ${approved ? "aprobó" : "rechazó"} el aval del anteproyecto`,
+        description: `Asesor ${approved ? "aprobó" : "rechazó"} el aval del anteproyecto`,
         metadata: { approved, comments },
       });
 
@@ -106,7 +114,7 @@ export default function EndorseAnteproject() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+    return <InlineSpinner text="Cargando..." />;
   }
 
   if (!stage || !project || !latestSubmission) {
@@ -159,7 +167,7 @@ export default function EndorseAnteproject() {
       {/* Formulario de aval */}
       <Card>
         <CardHeader>
-          <CardTitle>Aval del Director</CardTitle>
+          <CardTitle>Aval del Asesor</CardTitle>
           <CardDescription>Revisa el anteproyecto y decide si otorgas tu aval.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

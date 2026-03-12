@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Users } from "lucide-react";
+import { useActiveRole } from "@/contexts/RoleContext";
 
 interface CatalogRow {
   project_id: string;
@@ -38,8 +40,10 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Catalog() {
-  const [rows, setRows] = useState<CatalogRow[]>([]);
+  const { activeRole } = useActiveRole();
+  const isStudent = activeRole === "STUDENT";
   const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
+  const [rows, setRows] = useState<CatalogRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -72,7 +76,7 @@ export default function Catalog() {
   });
 
   if (loading) {
-    return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando catálogo...</div>;
+    return <InlineSpinner text="Cargando catálogo..." />;
   }
 
   return (
@@ -154,49 +158,57 @@ export default function Catalog() {
               <TableRow>
                 <TableHead>Título</TableHead>
                 <TableHead>Programa</TableHead>
-                <TableHead>Autores</TableHead>
+                {!isStudent && <TableHead>Autores</TableHead>}
                 <TableHead>Estado</TableHead>
                 <TableHead>Etapa</TableHead>
-                <TableHead>Estado Oficial</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead></TableHead>
+                {!isStudent && <TableHead>Estado Oficial</TableHead>}
+                {!isStudent && <TableHead>Fecha</TableHead>}
+                {!isStudent && <TableHead></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.project_id}>
-                  <TableCell className="font-medium text-sm max-w-[200px] truncate">
+                  <TableCell className="font-medium text-sm">
                     {r.title}
                   </TableCell>
                   <TableCell className="text-sm">{r.program_name || "—"}</TableCell>
-                  <TableCell className="text-sm">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-muted-foreground" />
-                      {r.author_count}
-                    </span>
-                  </TableCell>
+                  {!isStudent && (
+                    <TableCell className="text-sm">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        {r.author_count}
+                      </span>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge className={`text-xs ${statusColors[r.global_status] || "bg-muted"}`}>
                       {r.global_status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{stageLabels[r.current_stage] || r.current_stage}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r.current_official_state}</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(r.created_at).toLocaleDateString("es-CO")}
-                  </TableCell>
-                  <TableCell>
-                    <Link to={`/catalog/${r.project_id}`}>
-                      <Button variant="ghost" size="sm" className="text-xs">Ver</Button>
-                    </Link>
-                  </TableCell>
+                  {!isStudent && (
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">{r.current_official_state}</Badge>
+                    </TableCell>
+                  )}
+                  {!isStudent && (
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString("es-CO")}
+                    </TableCell>
+                  )}
+                  {!isStudent && (
+                    <TableCell>
+                      <Link to={`/catalog/${r.project_id}`}>
+                        <Button variant="ghost" size="sm" className="text-xs">Ver</Button>
+                      </Link>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={isStudent ? 4 : 8} className="text-center text-muted-foreground py-8">
                     No se encontraron proyectos
                   </TableCell>
                 </TableRow>

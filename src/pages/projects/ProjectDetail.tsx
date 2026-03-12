@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveRole } from "@/contexts/RoleContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, FileText, CheckCircle, AlertCircle, Users, CalendarClock, ExternalLink } from "lucide-react";
+import { Clock, User, FileText, CheckCircle, AlertCircle, Users, CalendarClock, ExternalLink, ClipboardCheck, ShieldCheck } from "lucide-react";
 
 const eventIcons: Record<string, React.ElementType> = {
   PROJECT_CREATED: FileText,
@@ -18,7 +20,8 @@ const eventIcons: Record<string, React.ElementType> = {
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { user, roles, primaryRole } = useAuth();
+  const { user, roles } = useAuth();
+  const { activeRole } = useActiveRole();
   const { toast } = useToast();
   const [project, setProject] = useState<any>(null);
   const [stages, setStages] = useState<any[]>([]);
@@ -27,6 +30,7 @@ export default function ProjectDetail() {
   const [deadlinesByStage, setDeadlinesByStage] = useState<Record<string, any>>({});
   const [submissionsByStage, setSubmissionsByStage] = useState<Record<string, any[]>>({});
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [evaluationsByStage, setEvaluationsByStage] = useState<Record<string, any[]>>({});
   const [directors, setDirectors] = useState<any[]>([]);
   const [selectedDirector, setSelectedDirector] = useState("");
   const [assigningDirector, setAssigningDirector] = useState(false);
@@ -34,14 +38,14 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId, primaryRole]);
+  }, [projectId, activeRole]);
 
   async function loadData() {
     const [projRes, stagesRes, membersRes, auditRes] = await Promise.all([
       supabase.from("projects").select("*, programs(name), modalities(name), user_profiles!projects_director_id_fkey(full_name)").eq("id", projectId!).maybeSingle(),
       supabase.from("project_stages").select("*").eq("project_id", projectId!).order("created_at"),
       supabase.from("project_members").select("*").eq("project_id", projectId!),
-      (primaryRole === "COORDINATOR" || primaryRole === "DECANO")
+      (activeRole === "COORDINATOR" || activeRole === "DECANO")
         ? supabase.from("audit_events").select("*").eq("project_id", projectId!).order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
     ]);
@@ -73,8 +77,8 @@ export default function ProjectDetail() {
     setDeadlinesByStage(deadlineMap);
 
     // Cargar submissions por etapa (visible para DIRECTOR y COORDINATOR)
-    const isDirectorOrCoord = roles.includes("DIRECTOR") || roles.includes("COORDINATOR") || roles.includes("DECANO");
-    if (isDirectorOrCoord && stagesList.length > 0) {
+    const isAsesorOrCoord = roles.includes("ASESOR") || roles.includes("COORDINATOR") || roles.includes("DECANO");
+    if (isAsesorOrCoord && stagesList.length > 0) {
       const stageIds = stagesList.map((s: any) => s.id);
       const { data: allSubs } = await supabase
         .from("submissions")
@@ -104,7 +108,33 @@ export default function ProjectDetail() {
       }
     }
 
-    // Fetch member profiles separately (no FK between project_members and user_profiles)
+    // Cargar evaluaciones por etapa
+    if (stagesList.length > 0) {
+      const stageIds = stagesList.map((s: any) => s.id);
+      const { data: evals } = await supabase
+        .from("evaluations")
+        .select("*")
+        .in("project_stage_id", stageIds);
+
+      if (evals && evals.length > 0) {
+        const evaluatorIds = [...new Set(evals.map((e: any) => e.evaluator_id))];
+        const { data: evalProfiles } = await supabase
+          .from("user_profiles")
+          .select("id, full_name")
+          .in("id", evaluatorIds);
+        const profMap = (evalProfiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc; }, {});
+
+        const evalsMap: Record<string, any[]> = {};
+        for (const ev of evals) {
+          const enriched = { ...ev, _evaluator: profMap[ev.evaluator_id] };
+          if (!evalsMap[ev.project_stage_id!]) evalsMap[ev.project_stage_id!] = [];
+          evalsMap[ev.project_stage_id!].push(enriched);
+        }
+        setEvaluationsByStage(evalsMap);
+      } else {
+        setEvaluationsByStage({});
+      }
+    }
     const rawMembers = membersRes.data || [];
     if (rawMembers.length > 0) {
       const userIds = rawMembers.map((m: any) => m.user_id);
@@ -115,41 +145,41 @@ export default function ProjectDetail() {
       setMembers([]);
     }
 
-    // Cargar directores disponibles si es coordinador
-    if (primaryRole === "COORDINATOR") {
-      const { data: dirRoles } = await supabase.from("user_roles").select("user_id").eq("role", "DIRECTOR");
-      if (dirRoles && dirRoles.length > 0) {
-        const { data: dirProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", dirRoles.map(r => r.user_id));
-        setDirectors(dirProfiles || []);
+    // Cargar asesores disponibles si es coordinador
+    if (activeRole === "COORDINATOR") {
+      const { data: asesorRoles } = await supabase.from("user_roles").select("user_id").eq("role", "ASESOR");
+      if (asesorRoles && asesorRoles.length > 0) {
+        const { data: asesorProfiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", asesorRoles.map(r => r.user_id));
+        setDirectors(asesorProfiles || []);
       }
     }
 
     setLoading(false);
   }
 
-  async function handleAssignDirector() {
+  async function handleAssignAsesor() {
     if (!selectedDirector || !projectId) return;
     setAssigningDirector(true);
     try {
-      const { error } = await supabase.from("projects").update({ director_id: selectedDirector }).eq("id", projectId);
+      const { error } = await supabase.from("projects").update({ asesor_id: selectedDirector }).eq("id", projectId);
       if (error) throw error;
 
       // Agregar como miembro del proyecto
       await supabase.from("project_members").insert({
         project_id: projectId,
         user_id: selectedDirector,
-        role: "DIRECTOR" as any,
+        role: "ASESOR" as any,
       });
 
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from("audit_events").insert({
         project_id: projectId,
         user_id: user?.id,
-        event_type: "DIRECTOR_ASSIGNED",
-        description: "Director asignado al proyecto",
+        event_type: "ASESOR_ASSIGNED",
+        description: "Asesor asignado al proyecto",
       });
 
-      toast({ title: "Director asignado exitosamente" });
+      toast({ title: "Asesor asignado exitosamente" });
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -158,7 +188,7 @@ export default function ProjectDetail() {
     }
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+  if (loading) return <InlineSpinner text="Cargando..." />;
   if (!project) return <div className="py-8 text-center text-muted-foreground">Proyecto no encontrado</div>;
 
   const statusColor: Record<string, string> = {
@@ -168,6 +198,41 @@ export default function ProjectDetail() {
     CANCELADO: "bg-destructive/80 text-destructive-foreground",
   };
 
+  // Determinar enlace de evaluación según etapa actual
+  const currentStage = stages.length > 0 ? stages[stages.length - 1] : null;
+  function getEvalLink() {
+    if (!currentStage || activeRole !== "COORDINATOR") return null;
+    const { stage_name, system_state, id } = currentStage;
+    if (stage_name === "PROPUESTA" && system_state === "RADICADA") return `/proposals/${id}/evaluate`;
+    if (stage_name === "ANTEPROYECTO") {
+      if (system_state === "RADICADA" || system_state === "AVALADO") return `/anteproyecto/${id}/assign-jurors`;
+      if (system_state === "EN_REVISION") return `/anteproyecto/${id}/consolidate`;
+    }
+    if (stage_name === "INFORME_FINAL") {
+      if (system_state === "RADICADA" || system_state === "AVALADO") return `/informe-final/${id}/assign-jurors`;
+      if (system_state === "EN_REVISION") return `/informe-final/${id}/consolidate`;
+    }
+    if (stage_name === "SUSTENTACION") {
+      if (system_state === "BORRADOR") return `/sustentacion/${id}/schedule`;
+      if (system_state === "RADICADA") return `/sustentacion/${id}/record-result`;
+    }
+    return null;
+  }
+  const evalLink = getEvalLink();
+
+  // Determinar enlace de aval para asesores
+  function getEndorseLink() {
+    if (!currentStage || activeRole !== "ASESOR") return null;
+    if (project.asesor_id !== user?.id) return null;
+    const { stage_name, system_state, id } = currentStage;
+    if ((stage_name === "ANTEPROYECTO" || stage_name === "INFORME_FINAL") && system_state === "RADICADA") {
+      const prefix = stage_name === "INFORME_FINAL" ? "informe-final" : "anteproyecto";
+      return { url: `/${prefix}/${id}/endorse`, label: `Avalar ${stage_name === "INFORME_FINAL" ? "Informe Final" : "Anteproyecto"}` };
+    }
+    return null;
+  }
+  const endorseInfo = getEndorseLink();
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-start justify-between">
@@ -175,9 +240,27 @@ export default function ProjectDetail() {
           <h1 className="text-2xl font-bold">{project.title}</h1>
           <p className="text-muted-foreground text-sm">{project.description}</p>
         </div>
-        <Badge className={statusColor[project.global_status] || "bg-muted"}>
-          {project.global_status}
-        </Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          {endorseInfo && (
+            <Link to={endorseInfo.url}>
+              <Button size="sm" variant="default" className="gap-1.5 shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+                {endorseInfo.label}
+              </Button>
+            </Link>
+          )}
+          {evalLink && (
+            <Link to={evalLink}>
+              <Button size="sm" className="gap-1.5 shadow-sm">
+                <ClipboardCheck className="h-4 w-4" />
+                Evaluar
+              </Button>
+            </Link>
+          )}
+          <Badge className={statusColor[project.global_status] || "bg-muted"}>
+            {project.global_status}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -195,29 +278,29 @@ export default function ProjectDetail() {
         </Card>
       </div>
 
-      {/* Director */}
+      {/* Asesor */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Director del Proyecto</CardTitle>
+          <CardTitle className="text-sm">Asesor del Proyecto</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {project.director_id && (
+          {project.asesor_id && (
             <div className="flex items-center gap-3 text-sm">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>{project.user_profiles?.full_name}</span>
-              <Badge variant="outline" className="text-xs">Director</Badge>
+              <Badge variant="outline" className="text-xs">Asesor</Badge>
             </div>
           )}
-          {primaryRole === "COORDINATOR" && directors.length > 0 && (
+          {activeRole === "COORDINATOR" && directors.length > 0 && (
             <div className="space-y-2">
-              {!project.director_id && (
-                <p className="text-sm text-muted-foreground">Este proyecto no tiene director asignado.</p>
+              {!project.asesor_id && (
+                <p className="text-sm text-muted-foreground">Este proyecto no tiene asesor asignado.</p>
               )}
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
                   <Select value={selectedDirector} onValueChange={setSelectedDirector}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar director" />
+                      <SelectValue placeholder="Seleccionar asesor" />
                     </SelectTrigger>
                     <SelectContent>
                       {directors.map(d => (
@@ -226,14 +309,14 @@ export default function ProjectDetail() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button size="sm" onClick={handleAssignDirector} disabled={!selectedDirector || assigningDirector} className="gap-1">
-                  <Users className="h-3 w-3" />{project.director_id ? "Cambiar" : "Asignar"}
+                <Button size="sm" onClick={handleAssignAsesor} disabled={!selectedDirector || assigningDirector} className="gap-1">
+                  <Users className="h-3 w-3" />{project.asesor_id ? "Cambiar" : "Asignar"}
                 </Button>
               </div>
             </div>
           )}
-          {!project.director_id && primaryRole !== "COORDINATOR" && (
-            <p className="text-sm text-muted-foreground italic">Sin director asignado</p>
+          {!project.asesor_id && activeRole !== "COORDINATOR" && (
+            <p className="text-sm text-muted-foreground italic">Sin asesor asignado</p>
           )}
         </CardContent>
       </Card>
@@ -292,6 +375,23 @@ export default function ProjectDetail() {
                       </span>
                     </div>
                   )}
+                  {evaluationsByStage[s.id]?.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground">Evaluaciones de Jurados:</p>
+                      {evaluationsByStage[s.id].map((ev: any) => (
+                        <div key={ev.id} className="flex items-center gap-2 text-xs flex-wrap">
+                          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{ev._evaluator?.full_name || "Evaluador"}</span>
+                          <Badge variant={ev.official_result === "APROBADA" ? "default" : ev.official_result === "NO_APROBADA" ? "destructive" : "outline"} className="text-[10px]">
+                            {ev.official_result || "Pendiente"}
+                          </Badge>
+                          {ev.observations && (
+                            <span className="text-muted-foreground">— {ev.observations}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {s.final_grade !== null && (
                   <Badge className="text-sm shrink-0">{s.final_grade}</Badge>
@@ -303,7 +403,7 @@ export default function ProjectDetail() {
       </Card>
 
       {/* Documentos por etapa (Director, Coordinador, Decano) */}
-      {(roles.includes("DIRECTOR") || roles.includes("COORDINATOR") || roles.includes("DECANO")) &&
+      {(roles.includes("ASESOR") || roles.includes("COORDINATOR") || roles.includes("DECANO")) &&
         Object.keys(submissionsByStage).length > 0 && (
         <Card>
           <CardHeader>

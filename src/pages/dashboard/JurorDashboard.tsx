@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
@@ -36,18 +37,54 @@ export default function JurorDashboard() {
           .eq("stage_name", a.stage_name)
           .maybeSingle();
 
-        // Verificar si ya existe evaluación del jurado para esta etapa
+        // Verificar si ya existe evaluación del jurado para la ÚLTIMA submission de esta etapa
         let alreadyEvaluated = false;
+        // Si es re-evaluación tras correcciones, verificar si ESTE jurado necesita re-evaluar
+        // (solo los que no dieron APROBADO en la submission anterior deben re-evaluar)
+        let needsReEvaluation = false;
         if (stage) {
-          const { count } = await supabase
-            .from("evaluations")
-            .select("*", { count: "exact", head: true })
-            .eq("evaluator_id", user!.id)
-            .eq("project_stage_id", stage.id);
-          alreadyEvaluated = (count || 0) > 0;
+          // Obtener las últimas 2 submissions para comparar
+          const { data: subs } = await supabase
+            .from("submissions")
+            .select("id, version")
+            .eq("project_stage_id", stage.id)
+            .order("version", { ascending: false })
+            .limit(2);
+
+          const latestSub = subs?.[0] || null;
+          const previousSub = subs?.[1] || null;
+
+          if (latestSub) {
+            // Verificar si ya evaluó la última submission
+            const { count } = await supabase
+              .from("evaluations")
+              .select("*", { count: "exact", head: true })
+              .eq("evaluator_id", user!.id)
+              .eq("submission_id", latestSub.id);
+            alreadyEvaluated = (count || 0) > 0;
+
+            // Si es versión > 1 y no ha evaluado aún, verificar si debe re-evaluar
+            if (!alreadyEvaluated && latestSub.version > 1 && previousSub) {
+              const { data: prevEval } = await supabase
+                .from("evaluations")
+                .select("official_result")
+                .eq("evaluator_id", user!.id)
+                .eq("submission_id", previousSub.id)
+                .maybeSingle();
+
+              // Solo necesita re-evaluar si su resultado anterior NO fue APROBADO
+              if (prevEval && prevEval.official_result !== "APROBADO") {
+                needsReEvaluation = true;
+              }
+              // Si aprobó en la versión anterior, se marca como ya evaluado (no necesita volver)
+              if (prevEval && prevEval.official_result === "APROBADO") {
+                alreadyEvaluated = true;
+              }
+            }
+          }
         }
 
-        return { ...a, stage, alreadyEvaluated };
+        return { ...a, stage, alreadyEvaluated, needsReEvaluation };
       })
     );
 
@@ -56,7 +93,7 @@ export default function JurorDashboard() {
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando asignaciones...</div>;
+    return <InlineSpinner text="Cargando asignaciones..." />;
   }
 
   const pending = assignments.filter((a) => !a.alreadyEvaluated);
@@ -84,6 +121,7 @@ export default function JurorDashboard() {
                 <p className="font-medium text-sm">{a.projects?.title}</p>
                 <p className="text-xs text-muted-foreground">
                   {a.projects?.programs?.name} — Etapa: {a.stage_name}
+                  {a.stage && <span className="ml-1">({a.stage.system_state === "CON_OBSERVACIONES" ? "Esperando nueva versión" : a.stage.system_state})</span>}
                 </p>
                 {a.due_date && (
                   <p className="text-xs text-muted-foreground">
@@ -91,11 +129,13 @@ export default function JurorDashboard() {
                   </p>
                 )}
               </div>
-              {a.stage && (
+              {a.stage && ["RADICADA", "AVALADO", "EN_REVISION"].includes(a.stage.system_state) ? (
                 <Link to={`/${a.stage_name === "INFORME_FINAL" ? "informe-final" : "anteproyecto"}/${a.stage.id}/evaluate`}>
                   <Button size="sm">Evaluar</Button>
                 </Link>
-              )}
+              ) : a.stage && a.stage.system_state === "CON_OBSERVACIONES" ? (
+                <Badge variant="outline" className="text-xs">Esperando correcciones</Badge>
+              ) : null}
             </div>
           ))}
           {pending.length === 0 && (

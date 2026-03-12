@@ -12,7 +12,7 @@ import { UserPlus } from "lucide-react";
 const ROLES = [
   { value: "STUDENT", label: "Estudiante" },
   { value: "COORDINATOR", label: "Coordinador" },
-  { value: "DIRECTOR", label: "Director" },
+  { value: "ASESOR", label: "Asesor" },
   { value: "JUROR", label: "Jurado" },
   { value: "DECANO", label: "Directivo" },
 ];
@@ -105,7 +105,7 @@ export default function CreateUser() {
     }
   }
 
-  const showProgram = selectedRoles.includes("STUDENT") || selectedRoles.includes("DIRECTOR");
+  const showProgram = selectedRoles.includes("STUDENT") || selectedRoles.includes("ASESOR");
 
   return (
     <div className="max-w-xl mx-auto">

@@ -2,6 +2,7 @@
  * StudentDashboard.tsx - Dashboard del estudiante con upload de documentos por etapa
  */
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +25,7 @@ const statusColors: Record<string, string> = {
 };
 
 const stateLabels: Record<string, string> = {
-  BORRADOR: "Borrador", RADICADA: "Radicada", EN_REVISION: "En Revisión",
+  BORRADOR: "Borrador", RADICADA: "Radicada", AVALADO: "Avalado", EN_REVISION: "En Revisión",
   CON_OBSERVACIONES: "Con Observaciones", CERRADA: "Cerrada",
 };
 
@@ -75,7 +76,9 @@ export default function StudentDashboard() {
   async function loadProject() {
     setLoading(true);
     const { data: memberships } = await supabase
-      .from("project_members").select("project_id").eq("user_id", user!.id).eq("role", "AUTHOR");
+      .from("project_members").select("project_id, projects!inner(global_status)")
+      .eq("user_id", user!.id).eq("role", "AUTHOR")
+      .eq("projects.global_status", "VIGENTE");
 
     if (memberships && memberships.length > 0) {
       const projectId = memberships[0].project_id;
@@ -104,14 +107,30 @@ export default function StudentDashboard() {
           if (subs && subs.length > 0) {
             const subIds = subs.map(s => s.id);
             const { data: evals } = await supabase
-              .from("evaluations").select("*, user_profiles:evaluator_id(full_name)")
+              .from("evaluations").select("*")
               .in("submission_id", subIds);
-            evalMap[stage.id] = evals || [];
+            const evalsList = evals || [];
+            // Fetch evaluator profiles separately
+            const evalUserIds = [...new Set(evalsList.map(e => e.evaluator_id))];
+            let evalProfilesMap: Record<string, any> = {};
+            if (evalUserIds.length > 0) {
+              const { data: profiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", evalUserIds);
+              (profiles || []).forEach(p => { evalProfilesMap[p.id] = p; });
+            }
+            evalMap[stage.id] = evalsList.map(e => ({ ...e, user_profiles: evalProfilesMap[e.evaluator_id] || null }));
 
             const { data: endorsements } = await supabase
-              .from("endorsements").select("*, user_profiles:endorsed_by(full_name)")
+              .from("endorsements").select("*")
               .in("submission_id", subIds);
-            endorseMap[stage.id] = endorsements || [];
+            const endorseList = endorsements || [];
+            // Fetch endorser profiles separately
+            const endorseUserIds = [...new Set(endorseList.map(e => e.endorsed_by))];
+            let endorseProfilesMap: Record<string, any> = {};
+            if (endorseUserIds.length > 0) {
+              const { data: profiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", endorseUserIds);
+              (profiles || []).forEach(p => { endorseProfilesMap[p.id] = p; });
+            }
+            endorseMap[stage.id] = endorseList.map(e => ({ ...e, user_profiles: endorseProfilesMap[e.endorsed_by] || null }));
           }
 
           // Cargar deadline para etapas CON_OBSERVACIONES
@@ -279,16 +298,16 @@ export default function StudentDashboard() {
       await supabase.from("audit_events").insert({
         project_id: project.id, user_id: user.id,
         event_type: "ENDORSEMENT_REQUESTED",
-        description: `Estudiante solicita aval del director para ${stage.stage_name}`,
+        description: `Estudiante solicita aval del asesor para ${stage.stage_name}`,
         metadata: { stage_id: stage.id, stage_name: stage.stage_name },
       });
-      toast({ title: "Solicitud de aval enviada", description: "Tu director será notificado." });
+      toast({ title: "Solicitud de aval enviada", description: "Tu asesor será notificado." });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   }
 
-  if (loading) return <div className="animate-pulse text-muted-foreground py-8 text-center">Cargando proyecto...</div>;
+  if (loading) return <InlineSpinner text="Cargando proyecto..." />;
 
   if (!project) {
     return (
@@ -318,13 +337,13 @@ export default function StudentDashboard() {
       );
     }
 
-    // Request endorsement (ANTEPROYECTO, INFORME_FINAL when RADICADA)
+    // Request endorsement (ANTEPROYECTO, INFORME_FINAL when RADICADA and no endorsement yet)
     if ((stage.stage_name === "ANTEPROYECTO" || stage.stage_name === "INFORME_FINAL") && stage.system_state === "RADICADA") {
       const hasEndorsement = (endorsementsByStage[stage.id] || []).length > 0;
       if (!hasEndorsement) {
         actions.push(
           <Button key="endorse" size="sm" variant="secondary" className="text-xs gap-1" onClick={() => handleRequestEndorsement(stage)}>
-            <Send className="h-3 w-3" />Solicitar Aval al Director
+            <Send className="h-3 w-3" />Solicitar Aval al Asesor
           </Button>
         );
       }
@@ -359,7 +378,7 @@ export default function StudentDashboard() {
         <CardContent className="space-y-2 text-sm">
           <p><span className="text-muted-foreground">Programa:</span> {project.programs?.name}</p>
           <p><span className="text-muted-foreground">Modalidad:</span> {project.modalities?.name}</p>
-          <p><span className="text-muted-foreground">Director:</span> {project.user_profiles?.full_name || <span className="text-muted-foreground italic">Sin asignar</span>}</p>
+          <p><span className="text-muted-foreground">Asesor:</span> {project.user_profiles?.full_name || <span className="text-muted-foreground italic">Sin asignar</span>}</p>
         </CardContent>
       </Card>
 

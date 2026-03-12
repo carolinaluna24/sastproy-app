@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,14 +17,14 @@ import { Textarea } from "@/components/ui/textarea";
  */
 
 function getGradeLabel(grade: number): string {
-  if (grade < 69) return "REPROBADA";
+  if (grade < 70) return "REPROBADA";
   if (grade <= 94) return "APROBADA";
   if (grade <= 99) return "MERITORIA";
   return "LAUREADA";
 }
 
 function getGradeOfficialState(grade: number): string {
-  if (grade < 69) return "NO_APROBADA";
+  if (grade < 70) return "NO_APROBADA";
   return "APROBADA";
 }
 
@@ -106,7 +107,7 @@ export default function RecordDefenseResult() {
     } finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+  if (loading) return <InlineSpinner text="Cargando..." />;
   if (!stage || !project) return <div className="py-8 text-center text-muted-foreground">No encontrado</div>;
 
   // Si ya tiene nota registrada
@@ -120,6 +121,31 @@ export default function RecordDefenseResult() {
             <p className="text-3xl font-bold">{stage.final_grade}/100</p>
             <p className="text-lg font-semibold">{label}</p>
             {stage.observations && <p className="text-sm text-muted-foreground">{stage.observations}</p>}
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>Volver</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Validar que la sustentación ya haya ocurrido
+  const defensePending = !defenseSession || new Date(defenseSession.scheduled_at) > new Date();
+  if (defensePending) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">{project.title}</CardTitle><CardDescription>{project.programs?.name}</CardDescription></CardHeader>
+          <CardContent className="text-center space-y-3">
+            {!defenseSession ? (
+              <p className="text-muted-foreground">No se ha programado una sustentación para este proyecto.</p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">
+                  La sustentación está programada para el <span className="font-semibold text-foreground">{new Date(defenseSession.scheduled_at).toLocaleString("es-CO")}</span>.
+                </p>
+                <p className="text-sm text-muted-foreground">Solo se puede registrar el resultado después de la fecha de sustentación.</p>
+              </>
+            )}
             <Button variant="outline" onClick={() => navigate("/dashboard")}>Volver</Button>
           </CardContent>
         </Card>
@@ -150,14 +176,41 @@ export default function RecordDefenseResult() {
         <CardHeader>
           <CardTitle>Registrar Resultado de Sustentación</CardTitle>
           <CardDescription>
-            Escala: Reprobada (&lt;69) · Aprobada (70-94) · Meritoria (95-99) · Laureada (100)
+            Escala: Reprobada (0-69) · Aprobada (70-94) · Meritoria (95-99) · Laureada (100)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="grade">Nota Final (0-100)</Label>
-              <Input id="grade" type="number" min={0} max={100} value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="Ej: 85" required />
+              <Input
+                id="grade"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={grade}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Solo permitir enteros entre 0 y 100
+                  if (val === "") {
+                    setGrade("");
+                    return;
+                  }
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num >= 0 && num <= 100) {
+                    setGrade(String(num));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Bloquear punto, coma, "e" para evitar decimales/notación científica
+                  if (e.key === "." || e.key === "," || e.key === "e" || e.key === "E") {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder="Ej: 85"
+                required
+              />
               {gradePreview && (
                 <p className="text-sm font-medium">
                   Mención: <span className={gradeNum < 69 ? "text-destructive" : "text-success"}>{gradePreview}</span>

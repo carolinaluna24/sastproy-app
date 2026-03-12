@@ -44,8 +44,10 @@ export default function CreateProject() {
   const [description, setDescription] = useState("");
   const [programId, setProgramId] = useState("");
   const [modalityId, setModalityId] = useState("");
+  const [secondAuthorSearchType, setSecondAuthorSearchType] = useState<"document" | "email">("document");
   const [secondAuthorIdType, setSecondAuthorIdType] = useState("");
   const [secondAuthorIdNumber, setSecondAuthorIdNumber] = useState("");
+  const [secondAuthorEmail, setSecondAuthorEmail] = useState("");
   // Validación del segundo autor
   const [secondAuthorStatus, setSecondAuthorStatus] = useState<"idle" | "checking" | "found" | "not_found">("idle");
   const [secondAuthorName, setSecondAuthorName] = useState("");
@@ -56,7 +58,7 @@ export default function CreateProject() {
   const [modalityConfigs, setModalityConfigs] = useState<ModalityConfig[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Cargar programas, modalidades y configuración al montar
+  // Cargar programas, modalidades, configuración y programa del estudiante al montar
   async function loadLookups() {
     const [{ data: progs }, { data: mods }, { data: configs }] = await Promise.all([
       supabase.from("programs").select("*"),
@@ -66,16 +68,30 @@ export default function CreateProject() {
     setPrograms(progs || []);
     setModalities(mods || []);
     setModalityConfigs((configs as ModalityConfig[]) || []);
+
+    // Auto-asignar programa del estudiante desde su perfil
+    if (user) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("program_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.program_id) {
+        setProgramId(profile.program_id);
+      }
+    }
   }
 
   useEffect(() => {
     loadLookups();
-  }, []);
+  }, [user]);
 
-  // Validar documento del segundo autor con debounce
+  // Validar segundo autor con debounce (por documento o email)
   useEffect(() => {
-    const idNum = secondAuthorIdNumber.trim();
-    if (!idNum || !secondAuthorIdType) {
+    const byDoc = secondAuthorSearchType === "document";
+    const searchValue = byDoc ? secondAuthorIdNumber.trim() : secondAuthorEmail.trim();
+
+    if (!searchValue || (byDoc && !secondAuthorIdType)) {
       setSecondAuthorStatus("idle");
       setSecondAuthorName("");
       return;
@@ -83,27 +99,28 @@ export default function CreateProject() {
 
     setSecondAuthorStatus("checking");
     const timeout = setTimeout(async () => {
-      const { data } = await supabase
-        .from("user_profiles")
-        .select("id, full_name")
-        .eq("id_type", secondAuthorIdType)
-        .eq("id_number", idNum)
-        .maybeSingle();
+      let query = supabase.from("user_profiles").select("id, full_name");
+
+      if (byDoc) {
+        query = query.eq("id_type", secondAuthorIdType).eq("id_number", searchValue);
+      } else {
+        query = query.eq("email", searchValue);
+      }
+
+      const { data } = await query.maybeSingle();
 
       if (!data) {
         setSecondAuthorStatus("not_found");
-        setSecondAuthorName("Documento no registrado en el sistema");
+        setSecondAuthorName(byDoc ? "Documento no registrado en el sistema" : "Correo no registrado en el sistema");
         return;
       }
 
-      // No permitir el mismo usuario
       if (user && data.id === user.id) {
         setSecondAuthorStatus("not_found");
         setSecondAuthorName("No puedes agregarte a ti mismo como segundo autor");
         return;
       }
 
-      // Verificar que tenga rol STUDENT
       const { data: isStudent } = await supabase
         .rpc("has_role", { _user_id: data.id, _role: "STUDENT" });
 
@@ -118,7 +135,7 @@ export default function CreateProject() {
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [secondAuthorIdType, secondAuthorIdNumber, user]);
+  }, [secondAuthorSearchType, secondAuthorIdType, secondAuthorIdNumber, secondAuthorEmail, user]);
 
   /**
    * Obtener la configuración de la modalidad seleccionada.
@@ -132,7 +149,10 @@ export default function CreateProject() {
   const selectedConfig = getSelectedConfig();
   const isImplemented = selectedConfig?.implemented ?? false;
 
-  const secondAuthorBlocks = (secondAuthorIdNumber.trim() !== "" || secondAuthorIdType !== "") && secondAuthorStatus !== "found";
+  const hasSecondAuthorInput = secondAuthorSearchType === "document"
+    ? (secondAuthorIdNumber.trim() !== "" || secondAuthorIdType !== "")
+    : secondAuthorEmail.trim() !== "";
+  const secondAuthorBlocks = hasSecondAuthorInput && secondAuthorStatus !== "found";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -144,6 +164,24 @@ export default function CreateProject() {
     setSubmitting(true);
 
     try {
+      // 0. Verificar que el estudiante no tenga ya un proyecto activo
+      const { data: activeProjects } = await supabase
+        .from("project_members")
+        .select("project_id, projects!inner(global_status)")
+        .eq("user_id", user.id)
+        .eq("role", "AUTHOR")
+        .eq("projects.global_status", "VIGENTE");
+
+      if (activeProjects && activeProjects.length > 0) {
+        toast({
+          title: "No puedes crear otro proyecto",
+          description: "Ya tienes un proyecto activo (VIGENTE). Un estudiante no puede participar en más de un proyecto activo.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // 1. Crear el proyecto en la tabla projects
       console.log("Creating project with:", { title, description, programId, modalityId, userId: user.id });
       const { data: project, error: projErr } = await supabase
@@ -174,13 +212,14 @@ export default function CreateProject() {
       if (memberErr) throw memberErr;
 
       // 3. Agregar segundo autor si se proporcionó
-      if (secondAuthorIdNumber.trim() && secondAuthorIdType) {
-        const { data: secondProfile } = await supabase
-          .from("user_profiles")
-          .select("id")
-          .eq("id_type", secondAuthorIdType)
-          .eq("id_number", secondAuthorIdNumber.trim())
-          .maybeSingle();
+      if (hasSecondAuthorInput && secondAuthorStatus === "found") {
+        let secondQuery = supabase.from("user_profiles").select("id");
+        if (secondAuthorSearchType === "document") {
+          secondQuery = secondQuery.eq("id_type", secondAuthorIdType).eq("id_number", secondAuthorIdNumber.trim());
+        } else {
+          secondQuery = secondQuery.eq("email", secondAuthorEmail.trim());
+        }
+        const { data: secondProfile } = await secondQuery.maybeSingle();
 
         if (!secondProfile) {
           toast({
@@ -277,41 +316,35 @@ export default function CreateProject() {
               />
             </div>
 
-            {/* Programa y Modalidad */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Programa (auto-asignado) */}
+            {programId && (
               <div className="space-y-2">
                 <Label>Programa</Label>
-                <Select value={programId} onValueChange={setProgramId} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {programs.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <p className="text-sm text-muted-foreground border rounded-md px-3 py-2 bg-muted/30">
+                  {programs.find((p) => p.id === programId)?.name || "Cargando..."}
+                </p>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <Label>Modalidad</Label>
-                <Select value={modalityId} onValueChange={setModalityId} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {modalities.map((m) => {
-                      const config = modalityConfigs.find((c) => c.modality_id === m.id);
-                      const impl = config?.implemented ?? false;
-                      return (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name} {impl ? "" : "(pendiente)"}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Modalidad */}
+            <div className="space-y-2">
+              <Label>Modalidad</Label>
+              <Select value={modalityId} onValueChange={setModalityId} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modalities.map((m) => {
+                    const config = modalityConfigs.find((c) => c.modality_id === m.id);
+                    const impl = config?.implemented ?? false;
+                    return (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} {impl ? "" : "(pendiente)"}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Aviso de modalidad no implementada */}
@@ -328,37 +361,65 @@ export default function CreateProject() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label>Segundo autor (opcional)</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Select value={secondAuthorIdType} onValueChange={setSecondAuthorIdType}>
-                  <SelectTrigger><SelectValue placeholder="Tipo doc." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CC">CC</SelectItem>
-                    <SelectItem value="TI">TI</SelectItem>
-                    <SelectItem value="CE">CE</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="relative col-span-2">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={secondAuthorSearchType === "document" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setSecondAuthorSearchType("document"); setSecondAuthorEmail(""); setSecondAuthorStatus("idle"); setSecondAuthorName(""); }}
+                >
+                  Por documento
+                </Button>
+                <Button
+                  type="button"
+                  variant={secondAuthorSearchType === "email" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setSecondAuthorSearchType("email"); setSecondAuthorIdType(""); setSecondAuthorIdNumber(""); setSecondAuthorStatus("idle"); setSecondAuthorName(""); }}
+                >
+                  Por correo electrónico
+                </Button>
+              </div>
+
+              {secondAuthorSearchType === "document" ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <Select value={secondAuthorIdType} onValueChange={setSecondAuthorIdType}>
+                    <SelectTrigger><SelectValue placeholder="Tipo doc." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CC">CC</SelectItem>
+                      <SelectItem value="TI">TI</SelectItem>
+                      <SelectItem value="CE">CE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="relative col-span-2">
+                    <Input
+                      value={secondAuthorIdNumber}
+                      onChange={(e) => setSecondAuthorIdNumber(e.target.value)}
+                      placeholder="Número de documento"
+                      maxLength={20}
+                      className={secondAuthorStatus === "not_found" ? "border-destructive" : secondAuthorStatus === "found" ? "border-green-500" : ""}
+                    />
+                    {secondAuthorStatus === "checking" && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                    {secondAuthorStatus === "found" && <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />}
+                    {secondAuthorStatus === "not_found" && <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />}
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
                   <Input
-                    id="secondAuthorIdNumber"
-                    value={secondAuthorIdNumber}
-                    onChange={(e) => setSecondAuthorIdNumber(e.target.value)}
-                    placeholder="Número de documento"
-                    maxLength={20}
+                    type="email"
+                    value={secondAuthorEmail}
+                    onChange={(e) => setSecondAuthorEmail(e.target.value)}
+                    placeholder="correo@ejemplo.com"
                     className={secondAuthorStatus === "not_found" ? "border-destructive" : secondAuthorStatus === "found" ? "border-green-500" : ""}
                   />
-                  {secondAuthorStatus === "checking" && (
-                    <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
-                  )}
-                  {secondAuthorStatus === "found" && (
-                    <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />
-                  )}
-                  {secondAuthorStatus === "not_found" && (
-                    <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />
-                  )}
+                  {secondAuthorStatus === "checking" && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                  {secondAuthorStatus === "found" && <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />}
+                  {secondAuthorStatus === "not_found" && <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />}
                 </div>
-              </div>
+              )}
+
               {secondAuthorStatus === "found" && (
                 <p className="text-xs text-green-600 flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" /> {secondAuthorName}

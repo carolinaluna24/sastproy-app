@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { InlineSpinner } from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +48,7 @@ export default function DecanoDashboard() {
     setLoading(false);
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando indicadores...</div>;
+  if (loading) return <InlineSpinner text="Cargando indicadores..." />;
 
   const byStatus = countBy(projects, "global_status");
   const byStage = countBy(currentStages, "stage_name");

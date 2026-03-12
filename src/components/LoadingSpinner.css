@@ -1,0 +1,40 @@
+.win10-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.win10-spinner .dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  top: 50%;
+  left: 50%;
+  margin: -4px 0 0 -4px;
+  animation: win10-orbit 3s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@keyframes win10-orbit {
+  0% {
+    transform: rotate(0deg) translateX(22px) rotate(0deg) scale(0.6);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: rotate(0deg) translateX(22px) rotate(0deg) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: rotate(720deg) translateX(22px) rotate(-720deg) scale(1);
+  }
+  90% {
+    opacity: 0;
+    transform: rotate(810deg) translateX(22px) rotate(-810deg) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(810deg) translateX(22px) rotate(-810deg) scale(0.6);
+  }
+}
