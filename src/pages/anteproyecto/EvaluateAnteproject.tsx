@@ -26,6 +26,7 @@ export default function EvaluateAnteproject() {
   const [observations, setObservations] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
@@ -54,7 +55,23 @@ export default function EvaluateAnteproject() {
         .select("*")
         .eq("project_stage_id", stageId)
         .order("version", { ascending: false });
-      setSubmissions(subs || []);
+      const subsList = subs || [];
+      setSubmissions(subsList);
+
+      // Pre-cargar signed URLs para archivos del bucket privado
+      const filePaths = subsList.map((s: any) => s.file_url).filter(Boolean);
+      if (filePaths.length > 0) {
+        const results = await Promise.all(
+          filePaths.map((path: string) =>
+            supabase.storage.from("documents").createSignedUrl(path, 3600)
+          )
+        );
+        const urlMap: Record<string, string> = {};
+        results.forEach((res, i) => {
+          if (res.data?.signedUrl) urlMap[filePaths[i]] = res.data.signedUrl;
+        });
+        setSignedUrls(urlMap);
+      }
     }
     setLoading(false);
   }
@@ -126,11 +143,17 @@ export default function EvaluateAnteproject() {
               <div key={s.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
                 <div>
                   <Badge variant="outline" className="mr-2">v{s.version}</Badge>
-                  {s.external_url ? (
-                    <a href={s.external_url} target="_blank" rel="noopener" className="text-primary underline">
-                      Ver documento
+                  {s.external_url && (
+                    <a href={s.external_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      URL externa
                     </a>
-                  ) : (
+                  )}
+                  {s.file_url && signedUrls[s.file_url] && (
+                    <a href={signedUrls[s.file_url]} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      Archivo PDF
+                    </a>
+                  )}
+                  {!s.external_url && !s.file_url && (
                     <span className="text-muted-foreground">Sin enlace</span>
                   )}
                 </div>
