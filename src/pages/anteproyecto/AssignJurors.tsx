@@ -103,11 +103,7 @@ export default function AssignJurors() {
       dueDate.setDate(dueDate.getDate() + 15);
 
       // MODDDD
-      toast({
-        title: "Mensaje",
-        description: "Jurado1: " + juror1 + " - Jurado2:" + juror2,
-        variant: "destructive",
-      });
+      toast({ title: "Mensaje", description: "Jurado1: " + juror1 + " - Jurado2:" + juror2, variant: "destructive" });
       //*******************
       // Insertar las 2 asignaciones
       /*
