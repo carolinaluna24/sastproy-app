@@ -94,7 +94,7 @@ export default function AssignJurorsInformeFinal() {
   if (loading) return <div className="py-8 text-center text-muted-foreground animate-pulse">Cargando...</div>;
   if (!stage || !project) return <div className="py-8 text-center text-muted-foreground">No encontrado</div>;
 
-  if (existingAssignments.length >= 2) {
+  if (existingAssignments.length > 0) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <Card>

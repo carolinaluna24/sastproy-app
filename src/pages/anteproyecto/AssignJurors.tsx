@@ -163,7 +163,7 @@ export default function AssignJurors() {
   }
 
   // Si ya hay asignaciones, mostrar info
-  if (existingAssignments.length >= 2) {
+  if (existingAssignments.length > 0) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <Card>
