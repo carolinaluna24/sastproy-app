@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, FileText, CheckCircle, AlertCircle, Users, CalendarClock } from "lucide-react";
+import { Clock, User, FileText, CheckCircle, AlertCircle, Users, CalendarClock, ExternalLink } from "lucide-react";
 
 const eventIcons: Record<string, React.ElementType> = {
   PROJECT_CREATED: FileText,
@@ -18,13 +18,15 @@ const eventIcons: Record<string, React.ElementType> = {
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { primaryRole } = useAuth();
+  const { user, roles, primaryRole } = useAuth();
   const { toast } = useToast();
   const [project, setProject] = useState<any>(null);
   const [stages, setStages] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
   const [deadlinesByStage, setDeadlinesByStage] = useState<Record<string, any>>({});
+  const [submissionsByStage, setSubmissionsByStage] = useState<Record<string, any[]>>({});
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [directors, setDirectors] = useState<any[]>([]);
   const [selectedDirector, setSelectedDirector] = useState("");
   const [assigningDirector, setAssigningDirector] = useState(false);
@@ -69,6 +71,38 @@ export default function ProjectDetail() {
       }
     }
     setDeadlinesByStage(deadlineMap);
+
+    // Cargar submissions por etapa (visible para DIRECTOR y COORDINATOR)
+    const isDirectorOrCoord = roles.includes("DIRECTOR") || roles.includes("COORDINATOR") || roles.includes("DECANO");
+    if (isDirectorOrCoord && stagesList.length > 0) {
+      const stageIds = stagesList.map((s: any) => s.id);
+      const { data: allSubs } = await supabase
+        .from("submissions")
+        .select("*")
+        .in("project_stage_id", stageIds)
+        .order("version", { ascending: false });
+
+      // Agrupar por etapa
+      const subsMap: Record<string, any[]> = {};
+      for (const sub of allSubs || []) {
+        if (!subsMap[sub.project_stage_id]) subsMap[sub.project_stage_id] = [];
+        subsMap[sub.project_stage_id].push(sub);
+      }
+      setSubmissionsByStage(subsMap);
+
+      // Pre-cargar signed URLs para archivos privados
+      const filePaths = (allSubs || []).map((s: any) => s.file_url).filter(Boolean);
+      if (filePaths.length > 0) {
+        const results = await Promise.all(
+          filePaths.map((path: string) => supabase.storage.from("documents").createSignedUrl(path, 3600))
+        );
+        const urlMap: Record<string, string> = {};
+        results.forEach((res, i) => {
+          if (res.data?.signedUrl) urlMap[filePaths[i]] = res.data.signedUrl;
+        });
+        setSignedUrls(urlMap);
+      }
+    }
 
     // Fetch member profiles separately (no FK between project_members and user_profiles)
     const rawMembers = membersRes.data || [];
@@ -267,6 +301,54 @@ export default function ProjectDetail() {
           })}
         </CardContent>
       </Card>
+
+      {/* Documentos por etapa (Director, Coordinador, Decano) */}
+      {(roles.includes("DIRECTOR") || roles.includes("COORDINATOR") || roles.includes("DECANO")) &&
+        Object.keys(submissionsByStage).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Documentos Radicados</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {stages.map((s) => {
+              const subs = submissionsByStage[s.id];
+              if (!subs || subs.length === 0) return null;
+              return (
+                <div key={s.id}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">{s.stage_name}</p>
+                  <div className="space-y-2">
+                    {subs.map((sub: any) => (
+                      <div key={sub.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline">v{sub.version}</Badge>
+                          {sub.external_url && (
+                            <a href={sub.external_url} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-primary underline">
+                              <ExternalLink className="h-3 w-3" /> URL externa
+                            </a>
+                          )}
+                          {sub.file_url && signedUrls[sub.file_url] && (
+                            <a href={signedUrls[sub.file_url]} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-primary underline">
+                              <FileText className="h-3 w-3" /> Archivo PDF
+                            </a>
+                          )}
+                          {!sub.external_url && !sub.file_url && (
+                            <span className="text-muted-foreground">Sin enlace</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(sub.created_at).toLocaleDateString("es-CO")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Audit trail (coordinator/decano) */}
       {auditEvents.length > 0 && (
