@@ -98,11 +98,13 @@ export default function ConsolidateAnteproject() {
 
     try {
       // Actualizar official_state de la etapa
+      // Si APROBADA_CON_MODIFICACIONES, se deja en CON_OBSERVACIONES para que el estudiante pueda radicar la versión 2
+      const newSystemState = consolidatedResult === "APROBADA_CON_MODIFICACIONES" ? "CON_OBSERVACIONES" : "CERRADA";
       const { error } = await supabase
         .from("project_stages")
         .update({
           official_state: consolidatedResult as any,
-          system_state: "CERRADA" as const,
+          system_state: newSystemState as any,
           observations: evaluations.map((e) => 
             `${(e.user_profiles as any)?.full_name}: ${e.official_result} - ${e.observations || "Sin observaciones"}`
           ).join("\n"),
