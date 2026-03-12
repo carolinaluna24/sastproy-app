@@ -84,6 +84,26 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Check for duplicates before creating
+    const duplicateChecks: { label: string; value: string; column: string }[] = [];
+    if (email) duplicateChecks.push({ label: "Correo electrónico", value: email, column: "email" });
+    if (phone) duplicateChecks.push({ label: "Teléfono", value: phone, column: "phone" });
+    if (id_number) duplicateChecks.push({ label: "Número de documento", value: id_number, column: "id_number" });
+
+    for (const check of duplicateChecks) {
+      const { data: existing } = await adminClient
+        .from("user_profiles")
+        .select("id")
+        .eq(check.column, check.value)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return new Response(
+          JSON.stringify({ error: `${check.label} ya está registrado para otro usuario` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,

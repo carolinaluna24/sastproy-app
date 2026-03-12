@@ -70,6 +70,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check for duplicates before updating
+    const duplicateChecks: { field: string; label: string; value: string; column: string }[] = [];
+    if (email) duplicateChecks.push({ field: "email", label: "Correo electrónico", value: email, column: "email" });
+    if (phone) duplicateChecks.push({ field: "phone", label: "Teléfono", value: phone, column: "phone" });
+    if (id_number) duplicateChecks.push({ field: "id_number", label: "Número de documento", value: id_number, column: "id_number" });
+
+    for (const check of duplicateChecks) {
+      const { data: existing } = await adminClient
+        .from("user_profiles")
+        .select("id")
+        .eq(check.column, check.value)
+        .neq("id", user_id)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return new Response(
+          JSON.stringify({ error: `${check.label} ya está registrado para otro usuario` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Update auth email if changed
     if (email) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(user_id, {
