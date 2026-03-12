@@ -131,6 +131,9 @@ export default function ManageUsers() {
     }
   }
 
+  const getRoleLabel = (role: string | null) => ROLES.find((r) => r.value === role)?.label || "Sin rol";
+  const getProgramName = (pid: string | null) => programs.find((p) => p.id === pid)?.name || "—";
+
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
     return (
@@ -139,9 +142,6 @@ export default function ManageUsers() {
       u.roles.some((r) => getRoleLabel(r).toLowerCase().includes(q))
     );
   });
-
-  const getRoleLabel = (role: string | null) => ROLES.find((r) => r.value === role)?.label || "Sin rol";
-  const getProgramName = (pid: string | null) => programs.find((p) => p.id === pid)?.name || "—";
   const getIdTypeLabel = (t: string | null) => {
     if (t === "CC") return "CC";
     if (t === "TI") return "TI";
