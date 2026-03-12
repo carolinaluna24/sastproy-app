@@ -35,14 +35,13 @@ export default function AssignJurors() {
     if (!stageId) return;
 
     // Cargar etapa
-    const { data: stageData } = await supabase
-      .from("project_stages")
-      .select("*")
-      .eq("id", stageId)
-      .maybeSingle();
+    const { data: stageData } = await supabase.from("project_stages").select("*").eq("id", stageId).maybeSingle();
     setStage(stageData);
 
-    if (!stageData) { setLoading(false); return; }
+    if (!stageData) {
+      setLoading(false);
+      return;
+    }
 
     // Cargar proyecto
     const { data: proj } = await supabase
@@ -70,17 +69,11 @@ export default function AssignJurors() {
     }
 
     // Cargar jurados disponibles (usuarios con rol JUROR)
-    const { data: jurorRoles } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .eq("role", "JUROR");
+    const { data: jurorRoles } = await supabase.from("user_roles").select("user_id").eq("role", "JUROR");
 
     if (jurorRoles && jurorRoles.length > 0) {
       const jurorIds = jurorRoles.map((r) => r.user_id);
-      const { data: profiles } = await supabase
-        .from("user_profiles")
-        .select("id, full_name, email")
-        .in("id", jurorIds);
+      const { data: profiles } = await supabase.from("user_profiles").select("id, full_name, email").in("id", jurorIds);
       setJurors(profiles || []);
     }
 
@@ -109,6 +102,9 @@ export default function AssignJurors() {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 15);
 
+      // MODDDD
+      toast({ title: "Mensaje", description: "Jurado1: " + juror1 + "Jurado2:" + juror2, variant: "destructive" });
+      //*******************
       // Insertar las 2 asignaciones
       const { error } = await supabase.from("assignments").insert([
         {
@@ -129,10 +125,7 @@ export default function AssignJurors() {
       if (error) throw error;
 
       // Actualizar estado de la etapa a EN_REVISION
-      await supabase
-        .from("project_stages")
-        .update({ system_state: "EN_REVISION" })
-        .eq("id", stage.id);
+      await supabase.from("project_stages").update({ system_state: "EN_REVISION" }).eq("id", stage.id);
 
       // Auditoría
       const juror1Name = jurors.find((j) => j.id === juror1)?.full_name || juror1;
@@ -200,10 +193,10 @@ export default function AssignJurors() {
           <CardContent className="py-8 text-center space-y-3">
             <AlertCircle className="h-10 w-10 text-warning mx-auto" />
             <p className="font-medium">Aval pendiente</p>
-            <p className="text-sm text-muted-foreground">
-              El director debe dar su aval antes de asignar jurados.
-            </p>
-            <Button variant="outline" onClick={() => navigate("/dashboard")}>Volver</Button>
+            <p className="text-sm text-muted-foreground">El director debe dar su aval antes de asignar jurados.</p>
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              Volver
+            </Button>
           </CardContent>
         </Card>
       </div>
