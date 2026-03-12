@@ -13,9 +13,27 @@
 import { supabase } from "@/integrations/supabase/client";
 export type AppRole = "STUDENT" | "COORDINATOR" | "DIRECTOR" | "JUROR" | "DECANO";
 
+const authErrorMessages: Record<string, string> = {
+  "Invalid login credentials": "Credenciales inválidas. Verifica tu correo y contraseña.",
+  "Email not confirmed": "Tu correo electrónico no ha sido confirmado. Revisa tu bandeja de entrada.",
+  "User not found": "No se encontró un usuario con ese correo electrónico.",
+  "Invalid email or password": "Correo o contraseña incorrectos.",
+  "Too many requests": "Demasiados intentos. Espera un momento antes de volver a intentar.",
+  "User already registered": "Este correo ya está registrado.",
+  "Signup requires a valid password": "Debes ingresar una contraseña válida.",
+  "Password should be at least 6 characters": "La contraseña debe tener al menos 6 caracteres.",
+};
+
+function translateAuthError(message: string): string {
+  return authErrorMessages[message] || message;
+}
+
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
+  if (error) {
+    error.message = translateAuthError(error.message);
+    throw error;
+  }
   return data;
 }
 
