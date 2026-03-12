@@ -20,6 +20,7 @@ export default function EndorseAnteproject() {
   const [stage, setStage] = useState<any>(null);
   const [project, setProject] = useState<any>(null);
   const [latestSubmission, setLatestSubmission] = useState<any>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [comments, setComments] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,16 @@ export default function EndorseAnteproject() {
         .eq("project_stage_id", stageId)
         .order("version", { ascending: false })
         .limit(1);
-      setLatestSubmission(subs?.[0] || null);
+      const sub = subs?.[0] || null;
+      setLatestSubmission(sub);
+
+      // Pre-cargar signed URL si hay file_url
+      if (sub?.file_url) {
+        const { data: signed } = await supabase.storage
+          .from("documents")
+          .createSignedUrl(sub.file_url, 3600);
+        if (signed?.signedUrl) setSignedUrl(signed.signedUrl);
+      }
     }
     setLoading(false);
   }
@@ -120,16 +130,22 @@ export default function EndorseAnteproject() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between rounded-lg border p-3 text-sm">
-            <div>
-              <Badge variant="outline" className="mr-2">v{latestSubmission.version}</Badge>
-              {latestSubmission.external_url ? (
-                <a href={latestSubmission.external_url} target="_blank" rel="noopener" className="text-primary underline">
-                  Ver documento
-                </a>
-              ) : (
-                <span className="text-muted-foreground">Sin enlace</span>
-              )}
-            </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline">v{latestSubmission.version}</Badge>
+                {latestSubmission.external_url && (
+                  <a href={latestSubmission.external_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
+                    URL externa
+                  </a>
+                )}
+                {signedUrl && (
+                  <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
+                    Archivo PDF
+                  </a>
+                )}
+                {!latestSubmission.external_url && !signedUrl && (
+                  <span className="text-muted-foreground text-sm">Sin enlace</span>
+                )}
+              </div>
             <span className="text-xs text-muted-foreground">
               {new Date(latestSubmission.created_at).toLocaleDateString("es-CO")}
             </span>
