@@ -102,6 +102,11 @@ export default function AssignJurors() {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 15);
 
+      //*****************
+      toast({ title: "Mensaje", description: project.id, variant: "destructive" });
+      //******************
+
+      /*
       // Insertar las 2 asignaciones
       const { error } = await supabase.from("assignments").insert([
         {
@@ -119,6 +124,8 @@ export default function AssignJurors() {
           due_date: dueDate.toISOString(),
         },
       ]);
+
+      */
       if (error) throw error;
 
       // Actualizar estado de la etapa a EN_REVISION
