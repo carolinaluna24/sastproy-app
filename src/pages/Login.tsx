@@ -49,7 +49,7 @@ export default function Login() {
               <Input
                 id="email"
                 type="email"
-                value="coordinator@test.com"
+                value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="correo@ejemplo.com"
                 required
@@ -60,7 +60,7 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                value="Test1234!"
+                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
