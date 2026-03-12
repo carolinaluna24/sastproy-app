@@ -50,6 +50,7 @@ export default function StudentDashboard() {
   const [evaluationsByStage, setEvaluationsByStage] = useState<Record<string, any[]>>({});
   const [endorsementsByStage, setEndorsementsByStage] = useState<Record<string, any[]>>({});
   const [deadlinesByStage, setDeadlinesByStage] = useState<Record<string, any>>({});
+  const [defenseSession, setDefenseSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // Upload dialog state
@@ -167,6 +168,17 @@ export default function StudentDashboard() {
         setEvaluationsByStage(evalMap);
         setEndorsementsByStage(endorseMap);
         setDeadlinesByStage(deadlineMap);
+
+        // Cargar sesión de sustentación si existe etapa SUSTENTACION
+        const sustStage = stagesList.find((s: any) => s.stage_name === "SUSTENTACION");
+        if (sustStage) {
+          const { data: session } = await supabase
+            .from("defense_sessions")
+            .select("*")
+            .eq("stage_id", sustStage.id)
+            .maybeSingle();
+          setDefenseSession(session);
+        }
 
         // Pre-cargar signed URLs para todos los archivos
         const allPaths = Object.values(subsMap)
@@ -445,6 +457,19 @@ export default function StudentDashboard() {
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {/* Fecha de sustentación programada */}
+                  {stageName === "SUSTENTACION" && defenseSession && (
+                    <Alert className="border-primary/30 bg-primary/5">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <AlertTitle className="text-sm font-semibold">Sustentación Programada</AlertTitle>
+                      <AlertDescription className="text-xs mt-1 space-y-0.5">
+                        <p><strong>Fecha:</strong> {new Date(defenseSession.scheduled_at).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</p>
+                        <p><strong>Lugar:</strong> {defenseSession.location}</p>
+                        {defenseSession.notes && <p><strong>Notas:</strong> {defenseSession.notes}</p>}
+                      </AlertDescription>
+                    </Alert>
                   )}
 
                   {/* Alerta de fecha límite para correcciones */}
