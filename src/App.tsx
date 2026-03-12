@@ -33,6 +33,7 @@ import Scalability from "./pages/about/Scalability";
 import CreateUser from "./pages/users/CreateUser";
 import ManageUsers from "./pages/users/ManageUsers";
 import ChangePassword from "./pages/settings/ChangePassword";
+import ExportData from "./pages/admin/ExportData";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -83,6 +84,8 @@ const App = () => (
             <Route path="/about/scalability" element={<Scalability />} />
             {/* Configuración */}
             <Route path="/settings/password" element={<ChangePassword />} />
+            {/* Administración */}
+            <Route path="/admin/export" element={<ExportData />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
