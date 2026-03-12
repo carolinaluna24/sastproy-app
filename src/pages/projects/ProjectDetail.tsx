@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, User, FileText, CheckCircle, AlertCircle, Users } from "lucide-react";
+import { Clock, User, FileText, CheckCircle, AlertCircle, Users, CalendarClock } from "lucide-react";
 
 const eventIcons: Record<string, React.ElementType> = {
   PROJECT_CREATED: FileText,
@@ -24,6 +24,7 @@ export default function ProjectDetail() {
   const [stages, setStages] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [deadlinesByStage, setDeadlinesByStage] = useState<Record<string, any>>({});
   const [directors, setDirectors] = useState<any[]>([]);
   const [selectedDirector, setSelectedDirector] = useState("");
   const [assigningDirector, setAssigningDirector] = useState(false);
@@ -44,8 +45,30 @@ export default function ProjectDetail() {
     ]);
 
     setProject(projRes.data);
-    setStages(stagesRes.data || []);
+    const stagesList = stagesRes.data || [];
+    setStages(stagesList);
     setAuditEvents(auditRes.data || []);
+
+    // Cargar deadlines de cada etapa que está en CON_OBSERVACIONES
+    const deadlineMap: Record<string, any> = {};
+    const stagesWithDeadline = stagesList.filter(s => s.system_state === "CON_OBSERVACIONES" || s.official_state === "APROBADA_CON_MODIFICACIONES");
+    if (stagesWithDeadline.length > 0) {
+      const stageIds = stagesWithDeadline.map(s => s.id);
+      const { data: deadlines } = await supabase
+        .from("deadlines")
+        .select("*")
+        .in("project_stage_id", stageIds)
+        .order("created_at", { ascending: false });
+      if (deadlines) {
+        for (const dl of deadlines) {
+          // Solo guardar el más reciente por etapa
+          if (!deadlineMap[dl.project_stage_id]) {
+            deadlineMap[dl.project_stage_id] = dl;
+          }
+        }
+      }
+    }
+    setDeadlinesByStage(deadlineMap);
 
     // Fetch member profiles separately (no FK between project_members and user_profiles)
     const rawMembers = membersRes.data || [];
@@ -203,22 +226,45 @@ export default function ProjectDetail() {
           <CardTitle className="text-sm">Etapas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {stages.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium text-sm">{s.stage_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {s.system_state} — {s.official_state}
-                </p>
-                {s.observations && (
-                  <p className="text-xs text-muted-foreground mt-1">📝 {s.observations}</p>
+          {stages.map((s) => {
+            const deadline = deadlinesByStage[s.id];
+            const dueDate = deadline ? new Date(deadline.due_date) : null;
+            const now = new Date();
+            const daysLeft = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+            const isOverdue = daysLeft !== null && daysLeft < 0;
+
+            return (
+              <div key={s.id} className="flex items-start justify-between rounded-lg border p-3 gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{s.stage_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.system_state} — {s.official_state}
+                  </p>
+                  {s.observations && (
+                    <p className="text-xs text-muted-foreground mt-1">📝 {s.observations}</p>
+                  )}
+                  {deadline && dueDate && (
+                    <div className={`flex items-center gap-1.5 mt-2 text-xs rounded-md px-2 py-1 w-fit ${isOverdue ? "bg-destructive/10 text-destructive" : daysLeft !== null && daysLeft <= 2 ? "bg-warning/10 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
+                      <CalendarClock className="h-3 w-3 shrink-0" />
+                      <span>
+                        <span className="font-medium">Fecha límite correcciones:</span>{" "}
+                        {dueDate.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}
+                        {" "}
+                        {isOverdue
+                          ? <span className="font-semibold">(Vencido)</span>
+                          : daysLeft === 0
+                            ? <span className="font-semibold">(Vence hoy)</span>
+                            : <span>({daysLeft} {daysLeft === 1 ? "día" : "días"} restantes)</span>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {s.final_grade !== null && (
+                  <Badge className="text-sm shrink-0">{s.final_grade}</Badge>
                 )}
               </div>
-              {s.final_grade !== null && (
-                <Badge className="text-sm">{s.final_grade}</Badge>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
