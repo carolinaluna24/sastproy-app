@@ -30,6 +30,7 @@ const stageLabels: Record<string, string> = {
   ANTEPROYECTO: "Anteproyecto",
   INFORME_FINAL: "Informe Final",
   SUSTENTACION: "Sustentación",
+  SIN_ASIGNAR: "Sin Asignar",
 };
 
 const statusColors: Record<string, string> = {
@@ -127,6 +128,7 @@ export default function Catalog() {
                   <SelectItem value="ANTEPROYECTO">Anteproyecto</SelectItem>
                   <SelectItem value="INFORME_FINAL">Informe Final</SelectItem>
                   <SelectItem value="SUSTENTACION">Sustentación</SelectItem>
+                  <SelectItem value="SIN_ASIGNAR">Sin Asignar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -140,6 +142,7 @@ export default function Catalog() {
                   <SelectItem value="APROBADA">Aprobada</SelectItem>
                   <SelectItem value="APROBADA_CON_MODIFICACIONES">Con Modificaciones</SelectItem>
                   <SelectItem value="NO_APROBADA">No Aprobada</SelectItem>
+                  <SelectItem value="SIN_ASIGNAR">Sin Asignar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -158,11 +161,11 @@ export default function Catalog() {
               <TableRow>
                 <TableHead>Título</TableHead>
                 <TableHead>Programa</TableHead>
-                {!isStudent && <TableHead>Autores</TableHead>}
+                <TableHead>Autores</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Etapa</TableHead>
-                {!isStudent && <TableHead>Estado Oficial</TableHead>}
-                {!isStudent && <TableHead>Fecha</TableHead>}
+                <TableHead>Estado Oficial</TableHead>
+                <TableHead>Fecha</TableHead>
                 {!isStudent && <TableHead></TableHead>}
               </TableRow>
             </TableHeader>
@@ -173,30 +176,24 @@ export default function Catalog() {
                     {r.title}
                   </TableCell>
                   <TableCell className="text-sm">{r.program_name || "—"}</TableCell>
-                  {!isStudent && (
-                    <TableCell className="text-sm">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                        {r.author_count}
-                      </span>
-                    </TableCell>
-                  )}
+                  <TableCell className="text-sm">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      {r.author_count}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <Badge className={`text-xs ${statusColors[r.global_status] || "bg-muted"}`}>
                       {r.global_status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{stageLabels[r.current_stage] || r.current_stage}</TableCell>
-                  {!isStudent && (
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">{r.current_official_state}</Badge>
-                    </TableCell>
-                  )}
-                  {!isStudent && (
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(r.created_at).toLocaleDateString("es-CO")}
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">{r.current_official_state}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(r.created_at).toLocaleDateString("es-CO")}
+                  </TableCell>
                   {!isStudent && (
                     <TableCell>
                       <Link to={`/catalog/${r.project_id}`}>
@@ -208,7 +205,7 @@ export default function Catalog() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isStudent ? 4 : 8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={isStudent ? 7 : 8} className="text-center text-muted-foreground py-8">
                     No se encontraron proyectos
                   </TableCell>
                 </TableRow>
