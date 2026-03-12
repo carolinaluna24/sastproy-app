@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-type OfficialState = "APROBADA" | "APROBADA_CON_MODIFICACIONES" | "NO_APROBADA";
+type JurorResult = "APROBADO" | "APLAZADO_POR_MODIFICACIONES" | "NO_APROBADO";
 
-export default function EvaluateProposal() {
+/** Página para que un jurado evalúe el anteproyecto */
+export default function EvaluateAnteproject() {
   const { stageId } = useParams<{ stageId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -21,10 +22,8 @@ export default function EvaluateProposal() {
   const [stage, setStage] = useState<any>(null);
   const [project, setProject] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
-  const [result, setResult] = useState<OfficialState | "">("");
+  const [result, setResult] = useState<JurorResult | "">("");
   const [observations, setObservations] = useState("");
-  const [directorId, setDirectorId] = useState("");
-  const [directors, setDirectors] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -56,20 +55,6 @@ export default function EvaluateProposal() {
         .eq("project_stage_id", stageId)
         .order("version", { ascending: false });
       setSubmissions(subs || []);
-
-      // Cargar directores disponibles para asignar si se aprueba
-      const { data: dirRoles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "DIRECTOR");
-      if (dirRoles && dirRoles.length > 0) {
-        const dirIds = dirRoles.map((r) => r.user_id);
-        const { data: profiles } = await supabase
-          .from("user_profiles")
-          .select("id, full_name, email")
-          .in("id", dirIds);
-        setDirectors(profiles || []);
-      }
     }
     setLoading(false);
   }
@@ -80,69 +65,30 @@ export default function EvaluateProposal() {
     setSubmitting(true);
 
     try {
-      // Actualizar etapa
-      const { error: updateErr } = await supabase
-        .from("project_stages")
-        .update({
-          system_state: "CERRADA",
-          official_state: result,
-          observations,
-        })
-        .eq("id", stage.id);
-      if (updateErr) throw updateErr;
+      // Obtener la última submission para vincular
+      const latestSub = submissions[0];
+      if (!latestSub) throw new Error("No hay radicación para evaluar");
 
-      // Si APROBADA, crear etapa ANTEPROYECTO y asignar director
-      if (result === "APROBADA") {
-        await supabase.from("project_stages").insert({
-          project_id: stage.project_id,
-          stage_name: "ANTEPROYECTO" as const,
-          system_state: "BORRADOR" as const,
-        });
-
-        // Asignar director al proyecto si se seleccionó
-        if (directorId) {
-          await supabase
-            .from("projects")
-            .update({ director_id: directorId })
-            .eq("id", stage.project_id);
-        }
-
-        await supabase.from("audit_events").insert({
-          project_id: stage.project_id,
-          user_id: user.id,
-          event_type: "ANTEPROYECTO_STAGE_CREATED",
-          description: "Etapa ANTEPROYECTO habilitada tras aprobación de propuesta",
-        });
-      }
-
-      // Si APROBADA_CON_MODIFICACIONES, crear deadline de 5 días hábiles
-      if (result === "APROBADA_CON_MODIFICACIONES") {
-        const dueDate = new Date();
-        let businessDays = 0;
-        while (businessDays < 5) {
-          dueDate.setDate(dueDate.getDate() + 1);
-          const day = dueDate.getDay();
-          if (day !== 0 && day !== 6) businessDays++;
-        }
-
-        await supabase.from("deadlines").insert({
-          project_stage_id: stage.id,
-          description: "Plazo para correcciones de propuesta",
-          due_date: dueDate.toISOString(),
-          created_by: user.id,
-        });
-      }
+      // Crear evaluación con resultado oficial del jurado
+      const { error } = await supabase.from("evaluations").insert({
+        submission_id: latestSub.id,
+        evaluator_id: user.id,
+        project_stage_id: stage.id,
+        official_result: result,
+        observations,
+      });
+      if (error) throw error;
 
       // Auditoría
       await supabase.from("audit_events").insert({
         project_id: stage.project_id,
         user_id: user.id,
-        event_type: "PROPOSAL_EVALUATED",
-        description: `Propuesta evaluada: ${result}`,
+        event_type: "ANTEPROYECTO_EVALUATED",
+        description: `Jurado evaluó anteproyecto: ${result}`,
         metadata: { result, observations },
       });
 
-      toast({ title: "Resultado registrado exitosamente" });
+      toast({ title: "Evaluación registrada exitosamente" });
       navigate("/dashboard");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -161,6 +107,7 @@ export default function EvaluateProposal() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {/* Info del proyecto */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{project.title}</CardTitle>
@@ -168,6 +115,7 @@ export default function EvaluateProposal() {
         </CardHeader>
       </Card>
 
+      {/* Documentos */}
       {submissions.length > 0 && (
         <Card>
           <CardHeader>
@@ -195,54 +143,27 @@ export default function EvaluateProposal() {
         </Card>
       )}
 
+      {/* Formulario de evaluación */}
       <Card>
         <CardHeader>
-          <CardTitle>Registrar Resultado del Comité</CardTitle>
-          <CardDescription>Ingrese el resultado de la evaluación de la propuesta.</CardDescription>
+          <CardTitle>Evaluación del Anteproyecto</CardTitle>
+          <CardDescription>Registra tu evaluación como jurado.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Resultado</Label>
-              <Select value={result} onValueChange={(v) => setResult(v as OfficialState)}>
+              <Select value={result} onValueChange={(v) => setResult(v as JurorResult)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar resultado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="APROBADA">Aprobada</SelectItem>
-                  <SelectItem value="APROBADA_CON_MODIFICACIONES">Aprobada con Modificaciones</SelectItem>
-                  <SelectItem value="NO_APROBADA">No Aprobada</SelectItem>
+                  <SelectItem value="APROBADO">Aprobado</SelectItem>
+                  <SelectItem value="APLAZADO_POR_MODIFICACIONES">Aplazado por Modificaciones</SelectItem>
+                  <SelectItem value="NO_APROBADO">No Aprobado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Asignar director si se aprueba */}
-            {result === "APROBADA" && directors.length > 0 && (
-              <div className="space-y-2">
-                <Label>Asignar Director de Proyecto</Label>
-                <Select value={directorId} onValueChange={setDirectorId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar director" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {directors.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.full_name} ({d.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Se habilitará la etapa ANTEPROYECTO automáticamente.
-                </p>
-              </div>
-            )}
-
-            {result === "APROBADA_CON_MODIFICACIONES" && (
-              <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
-                Se creará un plazo de 5 días hábiles para las correcciones.
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="observations">Observaciones</Label>
@@ -250,14 +171,15 @@ export default function EvaluateProposal() {
                 id="observations"
                 value={observations}
                 onChange={(e) => setObservations(e.target.value)}
-                placeholder="Observaciones del comité"
-                rows={4}
+                placeholder="Escribe tus observaciones detalladas"
+                rows={5}
+                required
               />
             </div>
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={submitting || !result}>
-                {submitting ? "Registrando..." : "Registrar Resultado"}
+                {submitting ? "Registrando..." : "Registrar Evaluación"}
               </Button>
               <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>
                 Cancelar

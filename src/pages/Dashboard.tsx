@@ -1,6 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
 import StudentDashboard from "./dashboard/StudentDashboard";
 import CoordinatorDashboard from "./dashboard/CoordinatorDashboard";
+import DirectorDashboard from "./dashboard/DirectorDashboard";
+import JurorDashboard from "./dashboard/JurorDashboard";
 
 export default function Dashboard() {
   const { primaryRole } = useAuth();
@@ -11,19 +13,9 @@ export default function Dashboard() {
     case "COORDINATOR":
       return <CoordinatorDashboard />;
     case "DIRECTOR":
-      return (
-        <div className="py-8 text-center text-muted-foreground">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Panel del Director</h1>
-          <p>Los proyectos asignados se mostrarán aquí en próximas etapas.</p>
-        </div>
-      );
+      return <DirectorDashboard />;
     case "JUROR":
-      return (
-        <div className="py-8 text-center text-muted-foreground">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Panel del Jurado</h1>
-          <p>Las asignaciones de evaluación se mostrarán aquí en próximas etapas.</p>
-        </div>
-      );
+      return <JurorDashboard />;
     default:
       return <div className="py-8 text-center text-muted-foreground">Sin rol asignado</div>;
   }
