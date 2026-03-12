@@ -101,13 +101,27 @@ export default function CreateProject() {
         .eq("email", email)
         .maybeSingle();
 
-      if (data) {
-        setSecondAuthorStatus("found");
-        setSecondAuthorName(data.full_name);
-      } else {
+      if (!data) {
         setSecondAuthorStatus("not_found");
         setSecondAuthorName("Correo no registrado en el sistema");
+        return;
       }
+
+      // Verificar que tenga rol STUDENT
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.id)
+        .eq("role", "STUDENT");
+
+      if (!roles || roles.length === 0) {
+        setSecondAuthorStatus("not_found");
+        setSecondAuthorName("El usuario no tiene rol de Estudiante");
+        return;
+      }
+
+      setSecondAuthorStatus("found");
+      setSecondAuthorName(data.full_name);
     }, 500);
 
     return () => clearTimeout(timeout);
