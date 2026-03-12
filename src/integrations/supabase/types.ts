@@ -818,6 +818,7 @@ export type Database = {
         Returns: boolean
       }
       is_coordinator: { Args: { uid: string }; Returns: boolean }
+      is_decano: { Args: { uid: string }; Returns: boolean }
       is_project_member: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: boolean

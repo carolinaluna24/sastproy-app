@@ -79,6 +79,8 @@ serve(async (req) => {
       { email: "juror3@test.com", name: "Elena Castro", role: "JUROR", programId: null },
       // 1 coordinador
       { email: "coordinator@test.com", name: "María Rodríguez", role: "COORDINATOR", programId: null },
+      // 1 decano (directivo académico)
+      { email: "decano@test.com", name: "Roberto Vargas", role: "DECANO", programId: null },
     ];
 
     const userIds: Record<string, string> = {};

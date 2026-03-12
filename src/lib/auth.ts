@@ -11,7 +11,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-export type AppRole = "STUDENT" | "COORDINATOR" | "DIRECTOR" | "JUROR";
+export type AppRole = "STUDENT" | "COORDINATOR" | "DIRECTOR" | "JUROR" | "DECANO";
 
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
