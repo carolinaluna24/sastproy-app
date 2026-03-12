@@ -38,6 +38,7 @@ export default function CatalogProjectDetail() {
   const { primaryRole, user } = useAuth();
   const [project, setProject] = useState<CatalogProject | null>(null);
   const [stages, setStages] = useState<any[]>([]);
+  const [authors, setAuthors] = useState<string[]>([]);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -65,6 +66,17 @@ export default function CatalogProjectDetail() {
       .order("created_at");
 
     setStages(stagesData || []);
+
+    // Cargar nombres de autores
+    const { data: membersData } = await supabase
+      .from("project_members")
+      .select("user_id, user_profiles(full_name)")
+      .eq("project_id", projectId!)
+      .eq("role", "AUTHOR");
+
+    setAuthors(
+      (membersData || []).map((m: any) => m.user_profiles?.full_name).filter(Boolean)
+    );
 
     // Verificar si el usuario tiene acceso completo
     if (user && primaryRole) {
@@ -120,9 +132,12 @@ export default function CatalogProjectDetail() {
         <Card>
           <CardContent className="py-3">
             <p className="text-muted-foreground text-xs">Autores</p>
-            <p className="font-medium flex items-center gap-1">
-              <Users className="h-3.5 w-3.5" /> {project.author_count}
-            </p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              <div className="text-sm font-medium">
+                {authors.length > 0 ? authors.join(", ") : `${project.author_count} autor(es)`}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
