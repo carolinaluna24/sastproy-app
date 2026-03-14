@@ -31,6 +31,7 @@ export default function CoordinatorDashboard() {
   const [projectAuthors, setProjectAuthors] = useState<Record<string, string[]>>({});
   const [projectCurrentStage, setProjectCurrentStage] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => { loadData(); }, []);
 
@@ -240,12 +241,35 @@ export default function CoordinatorDashboard() {
 
       {/* Tabla de proyectos */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Todos los Proyectos</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle className="text-base">Todos los Proyectos</CardTitle>
+          <div className="relative w-64">
+            <input
+              type="text"
+              placeholder="Buscar proyecto…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+          </div>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader><TableRow><TableHead>Título</TableHead><TableHead>Autor(es)</TableHead><TableHead>Programa</TableHead><TableHead>Asesor</TableHead><TableHead>Etapa</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
             <TableBody>
-              {projects.map((p) => {
+              {projects
+                .filter((p) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  const authors = (projectAuthors[p.id] || []).join(", ").toLowerCase();
+                  return (
+                    p.title?.toLowerCase().includes(term) ||
+                    p.programs?.name?.toLowerCase().includes(term) ||
+                    p.user_profiles?.full_name?.toLowerCase().includes(term) ||
+                    authors.includes(term)
+                  );
+                })
+                .map((p) => {
                 const evalLink = getEvaluateLink(p.id);
                 const currentStage = projectCurrentStage[p.id];
                 return (
