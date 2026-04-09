@@ -27,6 +27,7 @@ import SubmitFinalDelivery from "./pages/sustentacion/SubmitFinalDelivery";
 import CoordinatorReports from "./pages/reports/CoordinatorReports";
 import DeadlinesRisk from "./pages/reports/DeadlinesRisk";
 import ProjectsReport from "./pages/reports/ProjectsReport";
+import AsesoresReport from "./pages/reports/AsesoresReport";
 import Catalog from "./pages/catalog/Catalog";
 import CatalogProjectDetail from "./pages/catalog/CatalogProjectDetail";
 import Scalability from "./pages/about/Scalability";
@@ -74,6 +75,7 @@ const App = () => (
             <Route path="/reports" element={<CoordinatorReports />} />
             <Route path="/reports/deadlines" element={<DeadlinesRisk />} />
             <Route path="/reports/projects" element={<ProjectsReport />} />
+            <Route path="/reports/asesores" element={<AsesoresReport />} />
             {/* Catálogo */}
             <Route path="/catalog" element={<Catalog />} />
             <Route path="/catalog/:projectId" element={<CatalogProjectDetail />} />

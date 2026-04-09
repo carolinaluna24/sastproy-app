@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FolderOpen, Layers, CheckCircle, AlertTriangle, List, Clock, BarChart3 } from "lucide-react";
+import { FolderOpen, Layers, CheckCircle, AlertTriangle, List, Clock, BarChart3, Users } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 function countBy<T>(items: T[], key: keyof T): Record<string, number> {
@@ -152,6 +152,7 @@ export default function CoordinatorReports() {
           </p>
         </div>
         <div className="flex gap-2 items-end">
+          <Link to="/reports/asesores"><Button variant="outline" size="sm" className="gap-2 text-xs"><Users className="h-3.5 w-3.5" />Asesores</Button></Link>
           <Link to="/reports/deadlines"><Button variant="outline" size="sm" className="gap-2 text-xs"><Clock className="h-3.5 w-3.5" />Plazos</Button></Link>
           <Link to="/reports/projects"><Button variant="outline" size="sm" className="gap-2 text-xs"><List className="h-3.5 w-3.5" />Proyectos</Button></Link>
         </div>

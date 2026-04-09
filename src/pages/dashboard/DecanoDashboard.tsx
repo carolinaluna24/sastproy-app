@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   FolderOpen, Layers, CheckCircle, AlertTriangle,
-  List, Clock, BarChart3, BookOpen, Eye
+  List, Clock, BarChart3, BookOpen, Eye, Users
 } from "lucide-react";
 
 function countBy<T>(items: T[], key: keyof T): Record<string, number> {
@@ -80,6 +80,7 @@ export default function DecanoDashboard() {
           <p className="text-muted-foreground text-sm">Indicadores del programa — Solo lectura</p>
         </div>
         <div className="flex gap-2">
+          <Link to="/reports/asesores"><Button variant="outline" size="sm" className="gap-2 text-xs"><Users className="h-3.5 w-3.5" />Asesores</Button></Link>
           <Link to="/reports"><Button variant="outline" size="sm" className="gap-2 text-xs"><BarChart3 className="h-3.5 w-3.5" />Reportes</Button></Link>
           <Link to="/catalog"><Button variant="outline" size="sm" className="gap-2 text-xs"><BookOpen className="h-3.5 w-3.5" />Catálogo</Button></Link>
         </div>
