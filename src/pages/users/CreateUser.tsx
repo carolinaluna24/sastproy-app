@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export default function CreateUser() {
   const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const firstNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.from("programs").select("id, name").then(({ data }) => {
@@ -97,8 +98,7 @@ export default function CreateUser() {
       setPhone("");
       setEmail("");
       setPassword("");
-      setSelectedRoles([]);
-      setProgramId("");
+      setTimeout(() => firstNameRef.current?.focus(), 100);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -126,7 +126,7 @@ export default function CreateUser() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">Nombres *</Label>
-                <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej: Juan Carlos" maxLength={100} />
+                <Input id="firstName" ref={firstNameRef} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej: Juan Carlos" maxLength={100} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Apellidos *</Label>
